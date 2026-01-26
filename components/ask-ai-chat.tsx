@@ -4,7 +4,7 @@ import { useState } from "react";
 
 type Msg =
   | { role: "user"; content: string }
-  | { role: "assistant"; content: string }
+  | { role: "assistant"; content: string; sources?: { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] } }
   | { role: "tool"; toolName: string; content: string }
   | {
     role: "approval";
@@ -13,6 +13,7 @@ type Msg =
     input: any;
     postToolMessage: string;
     status: "pending" | "approved" | "rejected";
+    sources?: { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] };
   };
 
 interface AskAIChatProps {
@@ -43,7 +44,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
     const data = await callAskAI(nextMsgs);
 
     if (data.type === "answer") {
-      setMessages([...nextMsgs, { role: "assistant", content: data.content }]);
+      setMessages([...nextMsgs, { role: "assistant", content: data.content, sources: data.sources }]);
     }
 
     if (data.type === "pendingTool") {
@@ -56,6 +57,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
           input: data.input,
           postToolMessage: data.postToolMessage ?? "ช่วยสรุปผลจาก tool output ให้หน่อย",
           status: "pending",
+          sources: data.sources,
         },
       ]);
     }
@@ -112,7 +114,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
     const ai = await callAskAI(withTool);
 
     if (ai.type === "answer") {
-      setMessages([...withTool, { role: "assistant", content: ai.content }]);
+      setMessages([...withTool, { role: "assistant", content: ai.content, sources: ai.sources }]);
     } else {
       setMessages([...withTool, { role: "assistant", content: "✅ ทำงานต่อไม่สำเร็จ กรุณาลองใหม่" }]);
     }
@@ -233,6 +235,40 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                   return (
                     <div key={idx} className="max-w-[95%] text-sm leading-relaxed py-4">
                       <div className="whitespace-pre-wrap leading-6 text-gray-800">{m.content}</div>
+
+                      {m.sources && (m.sources.docs.length > 0 || m.sources.dictionary.length > 0) && (
+                        <div className="mt-4 pt-3 border-t border-gray-100">
+                          <div className="flex items-center gap-1.5 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            ที่มาของข้อมูล
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {m.sources.docs.map((doc, dIdx) => (
+                              <a
+                                key={dIdx}
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-[11px] font-medium border border-blue-100 hover:bg-blue-100 transition-colors"
+                              >
+                                {doc.title}
+                              </a>
+                            ))}
+                            {m.sources.dictionary.map((dict, dIdx) => (
+                              <span
+                                key={dIdx}
+                                title={dict.title}
+                                className="inline-flex items-center px-2 py-1 rounded-md bg-purple-50 text-purple-700 text-[11px] font-medium border border-purple-100"
+                              >
+                                DB: {dict.table}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Feedback buttons */}
                       <div className="mt-2 flex items-center gap-0.5">
                         <div className="flex items-center gap-0.5">
@@ -285,6 +321,32 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                       <pre className="text-[11px] bg-white border border-amber-100 p-2 rounded max-h-32 overflow-auto font-mono whitespace-pre-wrap">
                         {JSON.stringify(m.input, null, 2)}
                       </pre>
+                      {m.sources && (m.sources.docs.length > 0 || m.sources.dictionary.length > 0) && (
+                        <div className="pt-2 border-t border-amber-100">
+                          <div className="flex flex-wrap gap-1.5">
+                            {m.sources.docs.map((doc, dIdx) => (
+                              <a
+                                key={dIdx}
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center px-1.5 py-0.5 rounded bg-white text-blue-700 text-[10px] font-medium border border-blue-100"
+                              >
+                                {doc.title}
+                              </a>
+                            ))}
+                            {m.sources.dictionary.map((dict, dIdx) => (
+                              <span
+                                key={dIdx}
+                                title={dict.title}
+                                className="inline-flex items-center px-1.5 py-0.5 rounded bg-white text-purple-700 text-[10px] font-medium border border-purple-100"
+                              >
+                                DB: {dict.table}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {m.status === "pending" ? (
                         <div className="flex gap-2">
                           <button

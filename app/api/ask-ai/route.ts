@@ -88,14 +88,19 @@ Tools ที่มี:
     return NextResponse.json({ type: "answer", content: result.text });
   }
 
+  const sources = {
+    docs: topDocs.map(d => ({ title: d.title, url: d.url })),
+    dictionary: topDict.map(d => ({ title: d.title, table: `${d.schema_name}.${d.table_name}` }))
+  };
+
   if (parsed.action === "answer") {
-    return NextResponse.json({ type: "answer", content: parsed.content ?? "" });
+    return NextResponse.json({ type: "answer", content: parsed.content ?? "", sources });
   }
 
   if (parsed.action === "tool") {
     const toolName = parsed.toolName as ToolName;
     if (!toolRegistry[toolName]) {
-      return NextResponse.json({ type: "answer", content: `ไม่พบ Tool: ${toolName}` });
+      return NextResponse.json({ type: "answer", content: `ไม่พบ Tool: ${toolName}`, sources });
     }
 
     const approvalId = crypto.randomUUID();
@@ -112,8 +117,9 @@ Tools ที่มี:
       toolName: pending.toolName,
       input: pending.input,
       postToolMessage: parsed.postToolMessage ?? "ช่วยสรุปผลจาก tool output ให้หน่อย",
+      sources
     });
   }
 
-  return NextResponse.json({ type: "answer", content: "ไม่สามารถประมวลผลได้" });
+  return NextResponse.json({ type: "answer", content: "ไม่สามารถประมวลผลได้", sources });
 }
