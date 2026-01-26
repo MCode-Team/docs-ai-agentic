@@ -8,21 +8,21 @@ interface RerankedItem<T = unknown> extends RerankItem<T> {
     rerankScore: number;
 }
 
+// Local zerank-2 service URL (Docker container)
+const ZERANK_URL = process.env.ZERANK_URL || "http://localhost:8787";
+
 export async function rerankZeroRank2<T = unknown>(
     query: string,
     items: RerankItem<T>[]
 ): Promise<RerankedItem<T>[]> {
-    const resp = await fetch("https://api.zerank.ai/v2/rerank", {
+    const resp = await fetch(`${ZERANK_URL}/rerank`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.ZERANK_API_KEY}`,
         },
         body: JSON.stringify({
-            model: "zerank-2",
             query,
-            documents: items.map((x) => ({ id: x.id, text: x.text })),
-            top_n: 8,
+            texts: items.map((x) => x.text),
         }),
     }).catch(() => null);
 
@@ -31,12 +31,15 @@ export async function rerankZeroRank2<T = unknown>(
     }
 
     const data = await resp.json();
+
+    // TEI format returns results with index and score
     const scoreMap = new Map<number, number>();
     for (const r of data.results || []) {
-        scoreMap.set(Number(r.id), Number(r.score));
+        scoreMap.set(Number(r.index), Number(r.score));
     }
 
     return items
-        .map((x) => ({ ...x, rerankScore: scoreMap.get(x.id) ?? 0 }))
+        .map((x, idx) => ({ ...x, rerankScore: scoreMap.get(idx) ?? 0 }))
         .sort((a, b) => b.rerankScore - a.rerankScore);
 }
+

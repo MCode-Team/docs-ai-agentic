@@ -27,5 +27,26 @@ services:
       - postgres_data:/var/lib/postgresql
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
 
+  zerank:
+    build:
+      context: ./zerank
+      dockerfile: Dockerfile
+    container_name: zerank-2
+    ports:
+      - "8787:80"
+    volumes:
+      - zerank_cache:/data
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+      - MODEL_ID=zeroentropy/zerank-2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 300s
+
 volumes:
   postgres_data:
+  zerank_cache:
