@@ -1,46 +1,156 @@
 import { NextResponse } from "next/server";
-import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
-import crypto from "crypto";
-
+import { cookies } from "next/headers";
+import { getOrCreateUser, getUserPreferences } from "@/lib/user";
+import {
+  initAgentState,
+  runAgentLoop,
+  type AgentState,
+} from "@/lib/agent";
+import { getMessages, addMessage } from "@/lib/memory";
 import { retrieveDocs } from "@/lib/retrieval-docs";
 import { retrieveDictionary } from "@/lib/retrieval-dictionary";
 import { rerankZeroRank2 } from "@/lib/rerank-zerank2";
-import { createPendingToolCall } from "@/lib/approval/runtime";
-import { toolRegistry, ToolName } from "@/lib/tools/registry";
 
 export const runtime = "nodejs";
 
+const USER_COOKIE_NAME = "user_code";
+
+// In-memory state store (for demo - use Redis in production)
+const agentStates = new Map<string, AgentState>();
+
 /**
- * This endpoint returns:
- * - { type: "answer", content }
- * - { type: "pendingTool", approvalId, toolName, input }
+ * POST /api/ask-ai
+ * 
+ * Body:
+ * - messages: array of { role, content }
+ * - conversationId?: string (optional, will create new if not provided)
+ * - agentic?: boolean (use agentic mode, default: true)
+ * 
+ * Returns:
+ * - { type: "answer", content, sources, conversationId }
+ * - { type: "pendingTool", approvalId, toolName, input, conversationId }
+ * - { type: "plan", steps, conversationId }
+ * - { type: "thinking", content }
  */
 export async function POST(req: Request) {
-  const { messages } = await req.json();
-  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  const cookieStore = await cookies();
+  let userCode = cookieStore.get(USER_COOKIE_NAME)?.value;
+
+  // Get or create user
+  const user = await getOrCreateUser(userCode);
+  userCode = user.userCode;
+
+  const body = await req.json();
+  const { messages, conversationId, agentic = true } = body;
+
+  const lastUser = [...messages].reverse().find((m: { role: string }) => m.role === "user");
   const question = lastUser?.content ?? "";
 
-  const docsCandidates = await retrieveDocs(question, 12);
-  const docsReranked = await rerankZeroRank2(
-    question,
-    docsCandidates.map((c) => ({ id: c.id, text: c.content, meta: c }))
-  );
-  const topDocs = docsReranked.slice(0, 4).map((x) => x.meta).filter((m): m is NonNullable<typeof m> => !!m);
+  // Set cookie for new users
+  const response = agentic
+    ? await handleAgenticMode(user.id, conversationId, question, messages)
+    : await handleSimpleMode(question, messages);
 
-  const dictCandidates = await retrieveDictionary(question, 8);
-  const topDict = dictCandidates.slice(0, 4);
+  // Set cookie if new user
+  if (!cookieStore.get(USER_COOKIE_NAME)?.value) {
+    response.cookies.set(USER_COOKIE_NAME, userCode, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
 
-  const docsContext = topDocs
-    .map((d, i) => `# DOC ${i + 1}\nTitle: ${d.title}\nURL: ${d.url}\n${d.content}`)
+  return response;
+}
+
+/**
+ * Agentic mode with planning, memory, and reflection
+ */
+async function handleAgenticMode(
+  userId: string,
+  conversationId: string | null,
+  question: string,
+  messages: { role: string; content: string }[]
+) {
+  // Initialize agent state
+  const state = await initAgentState(userId, conversationId, question);
+  agentStates.set(state.conversationId, state);
+
+  // Get user preferences
+  const prefs = await getUserPreferences(userId);
+
+  // Run agent loop and collect events
+  const events: any[] = [];
+  let finalAnswer = "";
+  let pendingTool: { approvalId: string; toolName: string; input: unknown } | null = null;
+
+  for await (const event of runAgentLoop(state)) {
+    events.push(event);
+
+    if (event.type === "answer") {
+      finalAnswer = event.content || "";
+    }
+
+    if (event.type === "tool_pending") {
+      pendingTool = {
+        approvalId: event.approvalId!,
+        toolName: event.toolName!,
+        input: event.toolInput!,
+      };
+      break; // Pause for approval
+    }
+  }
+
+  // Build sources from context
+  const sources = await buildSources(question);
+
+  if (pendingTool) {
+    return NextResponse.json({
+      type: "pendingTool",
+      ...pendingTool,
+      conversationId: state.conversationId,
+      sources,
+    });
+  }
+
+  return NextResponse.json({
+    type: "answer",
+    content: finalAnswer,
+    conversationId: state.conversationId,
+    events: events.slice(0, 10), // Limit events for response size
+    sources,
+  });
+}
+
+/**
+ * Simple mode (legacy, non-agentic)
+ */
+async function handleSimpleMode(
+  question: string,
+  messages: { role: string; content: string }[]
+) {
+  const { openai } = await import("@ai-sdk/openai");
+  const { generateText } = await import("ai");
+  const { createPendingToolCall } = await import("@/lib/approval/runtime");
+  const { toolRegistry } = await import("@/lib/tools/registry");
+  type ToolName = import("@/lib/tools/registry").ToolName;
+  const crypto = await import("crypto");
+
+  const sources = await buildSources(question);
+
+  const docsContext = sources.docs
+    .map((d, i) => `# DOC ${i + 1}\nTitle: ${d.title}\nURL: ${d.url}`)
     .join("\n---\n");
 
-  const dictContext = topDict
-    .map(
-      (d, i) =>
-        `# DB ${i + 1}\n${d.title}\nSchema.Table.Column: ${d.schema_name}.${d.table_name}.${d.column_name}\n${d.content}`
-    )
+  const dictContext = sources.dictionary
+    .map((d, i) => `# DB ${i + 1}\n${d.title}\nTable: ${d.table}`)
     .join("\n---\n");
+
+  const formattedMessages = messages.map(m => ({
+    role: m.role as "user" | "assistant" | "system" | "tool",
+    content: m.content
+  }));
 
   const result = await generateText({
     model: openai("gpt-5-mini"),
@@ -69,45 +179,44 @@ Tools ที่มี:
 - getOrderStatusCounts(dateFrom,dateTo)
 - analyzeData(rows, groupBy, sumField, topN)
 - exportExcelDynamic(filename, sheets, styles, conditionalRules)
-
-หมายเหตุ:
-- ถ้าจะ export excel ให้ใส่ postToolMessage ว่าให้ส่งลิงก์ไฟล์ + สรุปสิ่งที่สร้าง
-- ถ้าดึงข้อมูลแล้ว ให้สรุปทันทีใน postToolMessage
     `.trim(),
     messages: [
-      ...messages,
+      ...(formattedMessages as any),
       { role: "system", content: `Docs Context:\n${docsContext}` },
       { role: "system", content: `DB Dictionary Context:\n${dictContext}` },
     ],
   });
 
-  let parsed: any;
+  let parsed: { action?: string; content?: string; toolName?: string; input?: unknown; postToolMessage?: string };
   try {
     parsed = JSON.parse(result.text);
   } catch {
-    return NextResponse.json({ type: "answer", content: result.text });
+    return NextResponse.json({ type: "answer", content: result.text, sources });
   }
 
-  const sources = {
-    docs: topDocs.map(d => ({ title: d.title, url: d.url })),
-    dictionary: topDict.map(d => ({ title: d.title, table: `${d.schema_name}.${d.table_name}` }))
-  };
-
   if (parsed.action === "answer") {
-    return NextResponse.json({ type: "answer", content: parsed.content ?? "", sources });
+    return NextResponse.json({
+      type: "answer",
+      content: parsed.content ?? "",
+      sources,
+    });
   }
 
   if (parsed.action === "tool") {
     const toolName = parsed.toolName as ToolName;
     if (!toolRegistry[toolName]) {
-      return NextResponse.json({ type: "answer", content: `ไม่พบ Tool: ${toolName}`, sources });
+      return NextResponse.json({
+        type: "answer",
+        content: `ไม่พบ Tool: ${toolName}`,
+        sources,
+      });
     }
 
     const approvalId = crypto.randomUUID();
     const pending = createPendingToolCall({
       id: approvalId,
       toolName,
-      input: parsed.input ?? {},
+      input: (parsed.input ?? {}) as Record<string, unknown>,
       createdAt: Date.now(),
     });
 
@@ -117,9 +226,39 @@ Tools ที่มี:
       toolName: pending.toolName,
       input: pending.input,
       postToolMessage: parsed.postToolMessage ?? "ช่วยสรุปผลจาก tool output ให้หน่อย",
-      sources
+      sources,
     });
   }
 
-  return NextResponse.json({ type: "answer", content: "ไม่สามารถประมวลผลได้", sources });
+  return NextResponse.json({
+    type: "answer",
+    content: "ไม่สามารถประมวลผลได้",
+    sources,
+  });
+}
+
+/**
+ * Build sources from retrieval
+ */
+async function buildSources(question: string) {
+  const docsCandidates = await retrieveDocs(question, 12);
+  const docsReranked = await rerankZeroRank2(
+    question,
+    docsCandidates.map((c) => ({ id: c.id, text: c.content, meta: c }))
+  );
+  const topDocs = docsReranked
+    .slice(0, 4)
+    .map((x) => x.meta)
+    .filter((m): m is NonNullable<typeof m> => !!m);
+
+  const dictCandidates = await retrieveDictionary(question, 8);
+  const topDict = dictCandidates.slice(0, 4);
+
+  return {
+    docs: topDocs.map((d) => ({ title: d.title, url: d.url })),
+    dictionary: topDict.map((d) => ({
+      title: d.title,
+      table: `${d.schema_name}.${d.table_name}`,
+    })),
+  };
 }

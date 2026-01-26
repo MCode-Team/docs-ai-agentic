@@ -1,10 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { type AgentEvent, type PlanStep } from "@/lib/agent/types";
+import { ChevronDown, ChevronRight, Loader2, PlayCircle, CheckCircle2, BrainCircuit } from "lucide-react";
+
 
 type Msg =
   | { role: "user"; content: string }
-  | { role: "assistant"; content: string; sources?: { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] } }
+  | {
+    role: "assistant";
+    content: string;
+    sources?: { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] };
+    events?: AgentEvent[];
+  }
   | { role: "tool"; toolName: string; content: string }
   | {
     role: "approval";
@@ -15,6 +23,83 @@ type Msg =
     status: "pending" | "approved" | "rejected";
     sources?: { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] };
   };
+
+function Thinking() {
+  return (
+    <div className="flex items-center gap-2 text-gray-500 text-sm animate-pulse p-2">
+      <BrainCircuit className="w-4 h-4" />
+      <span className="font-medium text-xs">Thinking...</span>
+    </div>
+  );
+}
+
+function Steps({ events }: { events?: AgentEvent[] }) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  if (!events || events.length === 0) return null;
+
+  // Filter relevant events to show as steps
+  const steps = events.filter(e =>
+    e.type === "thinking" ||
+    e.type === "tool_pending" ||
+    e.type === "tool_result" ||
+    (e.type === "step_started" && e.step?.type === "tool")
+  );
+
+  if (steps.length === 0) return null;
+
+  return (
+    <div className="bg-gray-50/50 rounded-lg border border-gray-100 overflow-hidden mb-3">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100/50 transition-colors"
+      >
+        {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        <span>Process Steps ({steps.length})</span>
+      </button>
+
+      {isOpen && (
+        <div className="px-3 pb-3 pt-0 space-y-2">
+          {steps.map((evt, idx) => {
+            if (evt.type === "thinking") {
+              return (
+                <div key={idx} className="text-[11px] text-gray-600 flex items-start gap-2 pl-1">
+                  <BrainCircuit className="w-3 h-3 mt-0.5 shrink-0 text-gray-400" />
+                  <span className="italic">{evt.content}</span>
+                </div>
+              );
+            }
+            if (evt.type === "step_started" && evt.step?.type === "tool") {
+              return (
+                <div key={idx} className="text-[11px] text-gray-700 flex items-center gap-2 pl-1">
+                  <PlayCircle className="w-3 h-3 text-blue-500 shrink-0" />
+                  <span className="font-mono">Call: {evt.step.toolName}</span>
+                </div>
+              );
+            }
+            if (evt.type === "tool_result") {
+              return (
+                <div key={idx} className="text-[11px] text-gray-600 flex items-start gap-2 pl-1 opacity-75">
+                  <CheckCircle2 className="w-3 h-3 mt-0.5 text-green-500 shrink-0" />
+                  <span>Tool Completed</span>
+                </div>
+              );
+            }
+            if (evt.type === "tool_pending") {
+              return (
+                <div key={idx} className="text-[11px] text-amber-600 flex items-center gap-2 pl-1">
+                  <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                  <span>Waiting for approval: {evt.toolName}</span>
+                </div>
+              );
+            }
+            return null;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface AskAIChatProps {
   onClose?: () => void;
@@ -44,7 +129,12 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
     const data = await callAskAI(nextMsgs);
 
     if (data.type === "answer") {
-      setMessages([...nextMsgs, { role: "assistant", content: data.content, sources: data.sources }]);
+      setMessages([...nextMsgs, {
+        role: "assistant",
+        content: data.content,
+        sources: data.sources,
+        events: data.events
+      }]);
     }
 
     if (data.type === "pendingTool") {
@@ -114,7 +204,12 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
     const ai = await callAskAI(withTool);
 
     if (ai.type === "answer") {
-      setMessages([...withTool, { role: "assistant", content: ai.content, sources: ai.sources }]);
+      setMessages([...withTool, {
+        role: "assistant",
+        content: ai.content,
+        sources: ai.sources,
+        events: ai.events
+      }]);
     } else {
       setMessages([...withTool, { role: "assistant", content: "✅ ทำงานต่อไม่สำเร็จ กรุณาลองใหม่" }]);
     }
@@ -234,6 +329,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                 if (m.role === "assistant") {
                   return (
                     <div key={idx} className="max-w-[95%] text-sm leading-relaxed py-4">
+                      <Steps events={m.events} />
                       <div className="whitespace-pre-wrap leading-6 text-gray-800">{m.content}</div>
 
                       {m.sources && (m.sources.docs.length > 0 || m.sources.dictionary.length > 0) && (
@@ -377,11 +473,8 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
               })}
 
               {loading && (
-                <div className="flex gap-3 animate-pulse py-4">
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-gray-100 rounded w-3/4" />
-                    <div className="h-4 bg-gray-100 rounded w-1/2" />
-                  </div>
+                <div className="py-4">
+                  <Thinking />
                 </div>
               )}
             </div>
