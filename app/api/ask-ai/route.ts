@@ -10,8 +10,9 @@ import { getMessages, addMessage } from "@/lib/memory";
 import { retrieveDocs } from "@/lib/retrieval-docs";
 import { retrieveDictionary } from "@/lib/retrieval-dictionary";
 import { rerankZeroRank2 } from "@/lib/rerank-zerank2";
+// export const runtime = "nodejs"; // Streaming preferred on edge or node with streaming support
+export const maxDuration = 60; // Allow longer timeout for agent loop
 
-export const runtime = "nodejs";
 
 const USER_COOKIE_NAME = "user_code";
 
@@ -67,6 +68,9 @@ export async function POST(req: Request) {
 /**
  * Agentic mode with planning, memory, and reflection
  */
+/**
+ * Agentic mode with planning, memory, and reflection
+ */
 async function handleAgenticMode(
   userId: string,
   conversationId: string | null,
@@ -80,46 +84,56 @@ async function handleAgenticMode(
   // Get user preferences
   const prefs = await getUserPreferences(userId);
 
-  // Run agent loop and collect events
-  const events: any[] = [];
-  let finalAnswer = "";
-  let pendingTool: { approvalId: string; toolName: string; input: unknown } | null = null;
+  // Create a stream
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
 
-  for await (const event of runAgentLoop(state)) {
-    events.push(event);
+      try {
+        // Run agent loop and stream events
+        for await (const event of runAgentLoop(state)) {
+          // Send event chunk
+          controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
 
-    if (event.type === "answer") {
-      finalAnswer = event.content || "";
+          if (event.type === "tool_pending") {
+            // Include sources with pending tool
+            const sources = await buildSources(question);
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: "pendingTool",
+              approvalId: event.approvalId,
+              toolName: event.toolName,
+              input: event.toolInput,
+              sources
+            }) + "\n"));
+            controller.close();
+            return;
+          }
+        }
+
+        // Final answer and sources
+        const sources = await buildSources(question);
+        controller.enqueue(encoder.encode(JSON.stringify({
+          type: "finish",
+          sources
+        }) + "\n"));
+
+        controller.close();
+      } catch (error: any) {
+        console.error("Agent Loop Error:", error);
+        controller.enqueue(encoder.encode(JSON.stringify({
+          type: "error",
+          error: error.message
+        }) + "\n"));
+        controller.close();
+      }
     }
+  });
 
-    if (event.type === "tool_pending") {
-      pendingTool = {
-        approvalId: event.approvalId!,
-        toolName: event.toolName!,
-        input: event.toolInput!,
-      };
-      break; // Pause for approval
+  return new NextResponse(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson",
+      "Transfer-Encoding": "chunked"
     }
-  }
-
-  // Build sources from context
-  const sources = await buildSources(question);
-
-  if (pendingTool) {
-    return NextResponse.json({
-      type: "pendingTool",
-      ...pendingTool,
-      conversationId: state.conversationId,
-      sources,
-    });
-  }
-
-  return NextResponse.json({
-    type: "answer",
-    content: finalAnswer,
-    conversationId: state.conversationId,
-    events: events.slice(0, 10), // Limit events for response size
-    sources,
   });
 }
 

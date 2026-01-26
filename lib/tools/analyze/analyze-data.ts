@@ -1,6 +1,5 @@
 import { tool } from "ai";
 import { z } from "zod";
-import * as dfd from "danfojs";
 
 export const analyzeDataTool = tool({
     description: "วิเคราะห์ข้อมูลแบบ pandas: groupby / sum / mean / sort / topN",
@@ -11,6 +10,7 @@ export const analyzeDataTool = tool({
         topN: z.number().optional().default(20),
     }),
     execute: async ({ rows, groupBy, sumField, topN }: { rows: any[]; groupBy?: string; sumField?: string; topN: number }) => {
+        const dfd = await import("danfojs");
         const df = new dfd.DataFrame(rows);
 
         if (!groupBy || !sumField) {

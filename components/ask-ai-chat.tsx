@@ -24,11 +24,11 @@ type Msg =
     sources?: { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] };
   };
 
-function Thinking() {
+function Thinking({ thought }: { thought?: string }) {
   return (
     <div className="flex items-center gap-2 text-gray-500 text-sm animate-pulse p-2">
       <BrainCircuit className="w-4 h-4" />
-      <span className="font-medium text-xs">Thinking...</span>
+      <span className="font-medium text-xs">Thinking... {thought && <span className="font-normal text-gray-400">({thought})</span>}</span>
     </div>
   );
 }
@@ -110,13 +110,41 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function callAskAI(nextMsgs: any[]) {
+  async function callAskAI(nextMsgs: any[], onEvent: (event: any) => void) {
     const res = await fetch("/api/ask-ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages: nextMsgs }),
     });
-    return res.json();
+
+    if (!res.body) return null;
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+            onEvent(event);
+          } catch (e) {
+            console.error("Error parsing event:", e, line);
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   async function send(text: string) {
@@ -126,31 +154,84 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
     setMessages(nextMsgs);
     setInput("");
 
-    const data = await callAskAI(nextMsgs);
+    // Initialize empty assistant message
+    const assistantMsgId = nextMsgs.length;
+    const assistantMsg: Msg = {
+      role: "assistant",
+      content: "",
+      events: []
+    };
 
-    if (data.type === "answer") {
-      setMessages([...nextMsgs, {
-        role: "assistant",
-        content: data.content,
-        sources: data.sources,
-        events: data.events
-      }]);
-    }
+    // Optimistic update
+    setMessages([...nextMsgs, assistantMsg]);
 
-    if (data.type === "pendingTool") {
-      setMessages([
-        ...nextMsgs,
-        {
-          role: "approval",
-          approvalId: data.approvalId,
-          toolName: data.toolName,
-          input: data.input,
-          postToolMessage: data.postToolMessage ?? "ช่วยสรุปผลจาก tool output ให้หน่อย",
-          status: "pending",
-          sources: data.sources,
-        },
-      ]);
-    }
+    await callAskAI(nextMsgs, (event) => {
+      setMessages((prev) => {
+        const msgs = [...prev];
+        // Ensure we are updating the last message which should be the assistant one
+        // If approval comes in, it might add a message, so we find the assistant message we added
+        const lastMsg = msgs[msgs.length - 1];
+
+        if (event.type === "thinking") {
+          // We can update the 'Thinking' component state if we want real-time text
+          // For now, simpler to just add event
+        }
+
+        if (lastMsg.role === "assistant") {
+          const newEvents = [...(lastMsg.events || []), event];
+
+          // If it's an answer event (Streaming) or final answer
+          if (event.type === "answer") {
+            // Streaming content support could go here if event.content is a chunk
+            // But our backend sends full content at end for now in 'answer' event of loop?
+            // Actually, the loop sends 'answer' event. 
+            // We might want to clear content if it was thinking placeholder?
+            // Let's rely on 'finish' type for final payload if we change backend to support that for 'sources'
+          }
+
+          // If backend sends "finish" with sources
+          if (event.type === "finish") {
+            lastMsg.sources = event.sources;
+          }
+
+          // If backend sends "pendingTool"
+          // This will be a separate replacement in logic below, wait.
+          // actually our loop in route.ts emits events. 
+
+          return [...msgs.slice(0, -1), {
+            ...lastMsg,
+            events: newEvents,
+            // Update content if event has content and is answer
+            content: event.type === "answer" ? (lastMsg.content + event.content) : lastMsg.content
+          }];
+        }
+
+        return msgs;
+      });
+
+      // Handle special control events that require state transitions
+      if (event.type === "pendingTool") {
+        setMessages(prev => {
+          // Remove the temporary assistant message if it was empty? 
+          // Or keep it as history of steps? 
+          // Better to keep it.
+          return [
+            ...prev,
+            {
+              role: "approval",
+              approvalId: event.approvalId,
+              toolName: event.toolName,
+              input: event.input,
+              postToolMessage: "ช่วยสรุปผลจาก tool output ให้หน่อย",
+              status: "pending",
+              sources: event.sources,
+            }
+          ];
+        });
+      }
+
+      // Handle finish event to maybe stop loading?
+    });
 
     setLoading(false);
   }
@@ -201,18 +282,30 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
 
     setMessages(withTool);
 
-    const ai = await callAskAI(withTool);
+    // For tool approval processing, similar logic
+    await callAskAI(withTool, (event) => {
+      setMessages((prev) => {
+        const msgs = [...prev];
+        const lastMsg = msgs[msgs.length - 1];
 
-    if (ai.type === "answer") {
-      setMessages([...withTool, {
-        role: "assistant",
-        content: ai.content,
-        sources: ai.sources,
-        events: ai.events
-      }]);
-    } else {
-      setMessages([...withTool, { role: "assistant", content: "✅ ทำงานต่อไม่สำเร็จ กรุณาลองใหม่" }]);
-    }
+        if (lastMsg.role !== "assistant") {
+          // Should add assistant msg if not there
+          return [...msgs, { role: "assistant", content: "", events: [event] }];
+        }
+
+        const newEvents = [...(lastMsg.events || []), event];
+
+        if (event.type === "finish") {
+          lastMsg.sources = event.sources;
+        }
+
+        return [...msgs.slice(0, -1), {
+          ...lastMsg,
+          events: newEvents,
+          content: event.type === "answer" ? (lastMsg.content + event.content) : lastMsg.content
+        }];
+      });
+    });
 
     setLoading(false);
   }
@@ -474,7 +567,10 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
 
               {loading && (
                 <div className="py-4">
-                  <Thinking />
+                  <Thinking thought={(() => {
+                    const last = messages[messages.length - 1];
+                    return last?.role === "assistant" ? last.events?.filter(e => e.type === "thinking").pop()?.content : undefined;
+                  })()} />
                 </div>
               )}
             </div>
