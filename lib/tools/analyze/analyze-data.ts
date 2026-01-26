@@ -10,6 +10,14 @@ export const analyzeDataTool = tool({
         topN: z.number().optional().default(20),
     }),
     execute: async ({ rows, groupBy, sumField, topN }: { rows: any[]; groupBy?: string; sumField?: string; topN: number }) => {
+        if (!rows || !Array.isArray(rows)) {
+            return {
+                error: "Invalid data: 'rows' must be an array of objects.",
+                receivedType: typeof rows,
+                rowsValue: rows ? "present" : "missing"
+            };
+        }
+
         const dfd = await import("danfojs");
         const df = new dfd.DataFrame(rows);
 

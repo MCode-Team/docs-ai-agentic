@@ -193,6 +193,7 @@ Tools ที่มี:
 - getOrderStatusCounts(dateFrom,dateTo)
 - analyzeData(rows, groupBy, sumField, topN)
 - exportExcelDynamic(filename, sheets, styles, conditionalRules)
+- getOrders(dateFrom, dateTo, limit)
     `.trim(),
     messages: [
       ...(formattedMessages as any),
@@ -227,7 +228,7 @@ Tools ที่มี:
     }
 
     const approvalId = crypto.randomUUID();
-    const pending = createPendingToolCall({
+    const pending = await createPendingToolCall({
       id: approvalId,
       toolName,
       input: (parsed.input ?? {}) as Record<string, unknown>,

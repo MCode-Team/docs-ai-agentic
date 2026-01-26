@@ -45,10 +45,21 @@ export async function updateUserPreferences(
 /**
  * Check if a tool should be auto-approved for a user
  */
+const SAFE_TOOLS = [
+    'getSalesSummary',
+    'getOrderStatusCounts',
+    'analyzeData'
+];
+
 export async function shouldAutoApproveTool(
     userId: string,
     toolName: string
 ): Promise<boolean> {
+    // Always approve safe tools
+    if (SAFE_TOOLS.includes(toolName)) {
+        return true;
+    }
+
     const prefs = await getUserPreferences(userId);
     if (!prefs) return false;
     return prefs.autoApproveTools.includes(toolName);
