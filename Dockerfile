@@ -5,11 +5,11 @@ WORKDIR /app
 # Install Bun
 ENV BUN_INSTALL="/root/.bun"
 ENV PATH="$BUN_INSTALL/bin:$PATH"
-RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.5"
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.6"
 
 # ---- Dependencies Stage ----
 FROM base AS deps
-# Install system dependencies requested
+# Install system dependencies requested (for font rendering and build tools)
 RUN apt-get update && apt-get install -y \
     build-essential \
     libfontconfig1 \
@@ -28,7 +28,7 @@ COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile
 
 # ---- Builder Stage ----
-FROM base AS builder
+FROM deps AS builder
 WORKDIR /app
 
 # Set additional environment variables
@@ -40,7 +40,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG BUILD_TIME
 ENV NEXT_PUBLIC_BUILD_TIME=$BUILD_TIME
 
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Generate Prisma client if needed (uncomment if using Prisma)
@@ -52,12 +51,8 @@ RUN bun run build
 FROM node:24-bullseye-slim AS runner
 WORKDIR /app
 
-# Install Bun in runner stage
-ENV BUN_INSTALL="/root/.bun"
-ENV PATH="$BUN_INSTALL/bin:$PATH"
-RUN apt-get update && apt-get install -y curl unzip && \
-    curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.5" && \
-    rm -rf /var/lib/apt/lists/*
+# Install Bun binary globally
+COPY --from=oven/bun:1.3.6 /usr/local/bin/bun /usr/local/bin/bun
 
 ENV NODE_ENV=production
 ENV TZ=Asia/Bangkok
@@ -72,12 +67,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user (Standard in Node images is 'node', but we'll create nextjs)
+# Create non-root user
 RUN groupadd --system --gid 1001 bunjs && \
     useradd --system --uid 1001 nextjs
 
 # Copy necessary files from builder
-COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 

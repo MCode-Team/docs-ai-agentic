@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
-import * as dfd from "danfojs-node";
+import * as dfd from "danfojs";
 
 export const analyzeDataTool = tool({
     description: "วิเคราะห์ข้อมูลแบบ pandas: groupby / sum / mean / sort / topN",

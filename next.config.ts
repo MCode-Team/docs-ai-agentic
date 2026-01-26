@@ -5,8 +5,6 @@ const nextConfig: NextConfig = {
     output: 'standalone',
     // Mark Node.js-only packages as external so they don't get bundled
     serverExternalPackages: [
-        'danfojs-node',
-        '@tensorflow/tfjs-node',
         '@mapbox/node-pre-gyp',
     ],
     // Silence Turbopack warning about custom webpack config if needed, 
