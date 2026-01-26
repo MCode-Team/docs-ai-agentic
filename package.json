@@ -1,0 +1,36 @@
+{
+  "name": "docs-ai",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix .",
+    "ingest:docs": "bun scripts/ingest-docs.ts",
+    "ingest:dict": "bun scripts/ingest-db-dictionary.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.19",
+    "@tailwindcss/postcss": "^4.1.18",
+    "ai": "^6.0.49",
+    "danfojs-node": "^1.2.0",
+    "exceljs": "^4.4.0",
+    "next": "^16.1.4",
+    "postcss": "^8.5.6",
+    "postgres": "^3.4.8",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "tailwindcss": "4.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "16.1.0",
+    "typescript": "5.9.3"
+  }
+}
