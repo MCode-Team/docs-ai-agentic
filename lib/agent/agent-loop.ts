@@ -306,7 +306,7 @@ export async function* resumeAgentAfterApproval(
     approved: boolean,
     toolOutput?: unknown
 ): AsyncGenerator<AgentEvent> {
-    const pending = getPendingToolCall(approvalId);
+    const pending = await getPendingToolCall(approvalId);
     if (!pending) {
         yield { type: "error", error: "Approval not found" };
         return;

@@ -1,28 +1,106 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { type AgentEvent, type PlanStep } from "@/lib/agent/types";
-import { ChevronDown, ChevronRight, Loader2, PlayCircle, CheckCircle2, BrainCircuit } from "lucide-react";
+import { useChat, type UIMessage } from "@ai-sdk/react";
+import { isTextUIPart, isDataUIPart, DefaultChatTransport } from "ai";
+import { useState, useMemo } from "react";
+import { ChevronDown, ChevronRight, PlayCircle, CheckCircle2, BrainCircuit } from "lucide-react";
 
+interface AskAIChatProps {
+  onClose?: () => void;
+}
 
-type Msg =
-  | { role: "user"; content: string }
-  | {
-    role: "assistant";
-    content: string;
-    sources?: { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] };
-    events?: AgentEvent[];
+type MessagePart = UIMessage["parts"][number];
+
+// Type guards with proper types
+function isThinkingPart(part: MessagePart): boolean {
+  return isDataUIPart(part) && part.type === "data-thinking";
+}
+
+function isSourcesPart(part: MessagePart): boolean {
+  return isDataUIPart(part) && (part.type === "data-sources" || part.type === "data-complete");
+}
+
+function isStepPart(part: MessagePart): boolean {
+  if (!isDataUIPart(part)) return false;
+  return ["data-thinking", "data-step", "data-tool-result", "data-plan"].includes(part.type);
+}
+
+function isToolPendingPart(part: MessagePart): boolean {
+  return isDataUIPart(part) && part.type === "data-tool-pending";
+}
+
+// Extract thinking data from message parts
+function getThinkingContent(message: UIMessage): string | undefined {
+  for (const part of message.parts) {
+    if (isThinkingPart(part) && isDataUIPart(part)) {
+      return (part.data as { content?: string })?.content;
+    }
   }
-  | { role: "tool"; toolName: string; content: string }
-  | {
-    role: "approval";
-    approvalId: string;
-    toolName: string;
-    input: any;
-    postToolMessage: string;
-    status: "pending" | "approved" | "rejected";
-    sources?: { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] };
-  };
+  return undefined;
+}
+
+// Extract sources from message parts
+function getSources(message: UIMessage): { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] } | undefined {
+  for (const part of message.parts) {
+    if (isSourcesPart(part) && isDataUIPart(part)) {
+      const data = part.data as {
+        sources?: { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] };
+        docs?: { title: string; url: string }[];
+        dictionary?: { title: string; table: string }[];
+      };
+      if (data.sources) return data.sources;
+      if (data.docs || data.dictionary) {
+        return {
+          docs: data.docs || [],
+          dictionary: data.dictionary || [],
+        };
+      }
+    }
+  }
+  return undefined;
+}
+
+// Extract steps/events from message parts
+function getSteps(message: UIMessage): Array<{ type: string; data: Record<string, unknown> }> {
+  const steps: Array<{ type: string; data: Record<string, unknown> }> = [];
+  for (const part of message.parts) {
+    if (isStepPart(part) && isDataUIPart(part)) {
+      steps.push({ type: part.type, data: part.data as Record<string, unknown> });
+    }
+  }
+  return steps;
+}
+
+// Extract pending tool approval from message parts
+function getPendingTool(message: UIMessage): {
+  approvalId: string;
+  toolName: string;
+  toolInput: unknown;
+  sources?: { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] };
+} | undefined {
+  for (const part of message.parts) {
+    if (isToolPendingPart(part) && isDataUIPart(part)) {
+      return part.data as {
+        approvalId: string;
+        toolName: string;
+        toolInput: unknown;
+        sources?: { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] };
+      };
+    }
+  }
+  return undefined;
+}
+
+// Get text content from message
+function getTextContent(message: UIMessage): string {
+  let text = "";
+  for (const part of message.parts) {
+    if (isTextUIPart(part)) {
+      text += part.text;
+    }
+  }
+  return text;
+}
 
 function Thinking({ thought }: { thought?: string }) {
   return (
@@ -33,18 +111,8 @@ function Thinking({ thought }: { thought?: string }) {
   );
 }
 
-function Steps({ events }: { events?: AgentEvent[] }) {
+function Steps({ steps }: { steps: Array<{ type: string; data: Record<string, unknown> }> }) {
   const [isOpen, setIsOpen] = useState(true);
-
-  if (!events || events.length === 0) return null;
-
-  // Filter relevant events to show as steps
-  const steps = events.filter(e =>
-    e.type === "thinking" ||
-    e.type === "tool_pending" ||
-    e.type === "tool_result" ||
-    (e.type === "step_started" && e.step?.type === "tool")
-  );
 
   if (steps.length === 0) return null;
 
@@ -60,36 +128,29 @@ function Steps({ events }: { events?: AgentEvent[] }) {
 
       {isOpen && (
         <div className="px-3 pb-3 pt-0 space-y-2">
-          {steps.map((evt, idx) => {
-            if (evt.type === "thinking") {
+          {steps.map((step, idx) => {
+            if (step.type === "data-thinking") {
               return (
                 <div key={idx} className="text-[11px] text-gray-600 flex items-start gap-2 pl-1">
                   <BrainCircuit className="w-3 h-3 mt-0.5 shrink-0 text-gray-400" />
-                  <span className="italic">{evt.content}</span>
+                  <span className="italic">{(step.data as { content?: string }).content}</span>
                 </div>
               );
             }
-            if (evt.type === "step_started" && evt.step?.type === "tool") {
+            if (step.type === "data-step") {
+              const stepData = step.data as { step?: { type?: string; toolName?: string } };
               return (
                 <div key={idx} className="text-[11px] text-gray-700 flex items-center gap-2 pl-1">
                   <PlayCircle className="w-3 h-3 text-blue-500 shrink-0" />
-                  <span className="font-mono">Call: {evt.step.toolName}</span>
+                  <span className="font-mono">Step: {stepData.step?.toolName || stepData.step?.type}</span>
                 </div>
               );
             }
-            if (evt.type === "tool_result") {
+            if (step.type === "data-tool-result") {
               return (
                 <div key={idx} className="text-[11px] text-gray-600 flex items-start gap-2 pl-1 opacity-75">
                   <CheckCircle2 className="w-3 h-3 mt-0.5 text-green-500 shrink-0" />
                   <span>Tool Completed</span>
-                </div>
-              );
-            }
-            if (evt.type === "tool_pending") {
-              return (
-                <div key={idx} className="text-[11px] text-amber-600 flex items-center gap-2 pl-1">
-                  <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                  <span>Waiting for approval: {evt.toolName}</span>
                 </div>
               );
             }
@@ -101,153 +162,54 @@ function Steps({ events }: { events?: AgentEvent[] }) {
   );
 }
 
-interface AskAIChatProps {
-  onClose?: () => void;
+// Custom transport that extends DefaultChatTransport
+class AskAIChatTransport extends DefaultChatTransport<UIMessage> {
+  constructor() {
+    super({
+      api: "/api/ask-ai",
+      body: { agentic: true },
+      prepareSendMessagesRequest: async ({ messages }) => {
+        return {
+          body: {
+            messages: messages.map(m => ({
+              role: m.role,
+              content: m.parts
+                .filter(p => isTextUIPart(p))
+                .map(p => (p as { text: string }).text)
+                .join(""),
+            })),
+            agentic: true,
+          },
+        };
+      },
+    });
+  }
 }
 
 export function AskAIChat({ onClose }: AskAIChatProps) {
-  const [messages, setMessages] = useState<Msg[]>([]);
+  const [pendingApprovals, setPendingApprovals] = useState<Map<string, { status: "pending" | "approved" | "rejected" }>>(new Map());
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  async function callAskAI(nextMsgs: any[], onEvent: (event: any) => void) {
-    const res = await fetch("/api/ask-ai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: nextMsgs }),
-    });
+  const transport = useMemo(() => new AskAIChatTransport(), []);
 
-    if (!res.body) return null;
+  const { messages, sendMessage, status, setMessages } = useChat({
+    id: "ask-ai-chat",
+    transport,
+  });
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
+  const isLoading = status === "streaming" || status === "submitted";
 
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!input.trim() || isLoading) return;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const event = JSON.parse(line);
-            onEvent(event);
-          } catch (e) {
-            console.error("Error parsing event:", e, line);
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-  }
-
-  async function send(text: string) {
-    if (!text.trim()) return;
-    setLoading(true);
-    const nextMsgs = [...messages, { role: "user", content: text } as Msg];
-    setMessages(nextMsgs);
+    const message = input;
     setInput("");
-
-    // Initialize empty assistant message
-    const assistantMsgId = nextMsgs.length;
-    const assistantMsg: Msg = {
-      role: "assistant",
-      content: "",
-      events: []
-    };
-
-    // Optimistic update
-    setMessages([...nextMsgs, assistantMsg]);
-
-    await callAskAI(nextMsgs, (event) => {
-      setMessages((prev) => {
-        const msgs = [...prev];
-        // Ensure we are updating the last message which should be the assistant one
-        // If approval comes in, it might add a message, so we find the assistant message we added
-        const lastMsg = msgs[msgs.length - 1];
-
-        if (event.type === "thinking") {
-          // We can update the 'Thinking' component state if we want real-time text
-          // For now, simpler to just add event
-        }
-
-        if (lastMsg.role === "assistant") {
-          const newEvents = [...(lastMsg.events || []), event];
-
-          // If it's an answer event (Streaming) or final answer
-          if (event.type === "answer") {
-            // Streaming content support could go here if event.content is a chunk
-            // But our backend sends full content at end for now in 'answer' event of loop?
-            // Actually, the loop sends 'answer' event. 
-            // We might want to clear content if it was thinking placeholder?
-            // Let's rely on 'finish' type for final payload if we change backend to support that for 'sources'
-          }
-
-          // If backend sends "finish" with sources
-          if (event.type === "finish") {
-            lastMsg.sources = event.sources;
-          }
-
-          // If backend sends "pendingTool"
-          // This will be a separate replacement in logic below, wait.
-          // actually our loop in route.ts emits events. 
-
-          return [...msgs.slice(0, -1), {
-            ...lastMsg,
-            events: newEvents,
-            // Update content if event has content and is answer
-            content: event.type === "answer" ? (lastMsg.content + event.content) : lastMsg.content
-          }];
-        }
-
-        return msgs;
-      });
-
-      // Handle special control events that require state transitions
-      if (event.type === "pendingTool") {
-        setMessages(prev => {
-          // Remove the temporary assistant message if it was empty? 
-          // Or keep it as history of steps? 
-          // Better to keep it.
-          return [
-            ...prev,
-            {
-              role: "approval",
-              approvalId: event.approvalId,
-              toolName: event.toolName,
-              input: event.input,
-              postToolMessage: "ช่วยสรุปผลจาก tool output ให้หน่อย",
-              status: "pending",
-              sources: event.sources,
-            }
-          ];
-        });
-      }
-
-      // Handle finish event to maybe stop loading?
-    });
-
-    setLoading(false);
+    await sendMessage({ text: message });
   }
 
-  async function approve(approvalId: string) {
-    setLoading(true);
-
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.role === "approval" && m.approvalId === approvalId ? { ...m, status: "approved" } : m
-      )
-    );
-
-    const approvalMsg = messages.find(
-      (m) => m.role === "approval" && m.approvalId === approvalId
-    ) as any;
+  async function approve(approvalId: string, toolName: string, toolInput: unknown) {
+    setPendingApprovals(prev => new Map(prev).set(approvalId, { status: "approved" }));
 
     const res = await fetch("/api/tools/approve", {
       method: "POST",
@@ -258,79 +220,31 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
     const data = await res.json();
 
     if (!data.ok) {
-      setMessages((prev) => [...prev, { role: "assistant", content: `❌ Tool error: ${data.error}` }]);
-      setLoading(false);
+      await sendMessage({
+        text: `❌ Tool error: ${data.error}`
+      });
       return;
     }
 
-    const withTool = [
-      ...messages.map((m) =>
-        m.role === "approval" && m.approvalId === approvalId ? { ...m, status: "approved" as const } : m
-      ),
-      {
-        role: "tool",
-        toolName: data.toolName,
-        content: JSON.stringify(data.result, null, 2),
-      } as Msg,
-      {
-        role: "user",
-        content: approvalMsg?.postToolMessage
-          ? `${approvalMsg.postToolMessage}\n\nTool Output:\n${JSON.stringify(data.result, null, 2)}`
-          : `ช่วยสรุปผลจาก Tool Output:\n${JSON.stringify(data.result, null, 2)}`,
-      } as Msg,
-    ];
-
-    setMessages(withTool);
-
-    // For tool approval processing, similar logic
-    await callAskAI(withTool, (event) => {
-      setMessages((prev) => {
-        const msgs = [...prev];
-        const lastMsg = msgs[msgs.length - 1];
-
-        if (lastMsg.role !== "assistant") {
-          // Should add assistant msg if not there
-          return [...msgs, { role: "assistant", content: "", events: [event] }];
-        }
-
-        const newEvents = [...(lastMsg.events || []), event];
-
-        if (event.type === "finish") {
-          lastMsg.sources = event.sources;
-        }
-
-        return [...msgs.slice(0, -1), {
-          ...lastMsg,
-          events: newEvents,
-          content: event.type === "answer" ? (lastMsg.content + event.content) : lastMsg.content
-        }];
-      });
+    // Send follow-up message with tool result
+    await sendMessage({
+      text: `ช่วยสรุปผลจาก Tool Output:\n${JSON.stringify(data.result, null, 2)}`,
     });
-
-    setLoading(false);
   }
 
   async function reject(approvalId: string) {
-    setLoading(true);
-
     await fetch("/api/tools/reject", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ approvalId }),
     });
 
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.role === "approval" && m.approvalId === approvalId ? { ...m, status: "rejected" } : m
-      )
-    );
-
-    setMessages((prev) => [...prev, { role: "assistant", content: "รับทราบครับ ✅ ยกเลิกการเรียก Tool แล้ว" }]);
-    setLoading(false);
+    setPendingApprovals(prev => new Map(prev).set(approvalId, { status: "rejected" }));
   }
 
   function clearChat() {
     setMessages([]);
+    setPendingApprovals(new Map());
   }
 
   return (
@@ -403,12 +317,13 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                 </div>
               )}
 
-              {messages.map((m, idx) => {
+              {messages.map((m) => {
                 if (m.role === "user") {
+                  const content = getTextContent(m);
                   return (
-                    <div key={idx} className="group flex w-full items-end justify-end gap-4 py-4">
+                    <div key={m.id} className="group flex w-full items-end justify-end gap-4 py-4">
                       <div className="relative flex flex-col gap-2 rounded-xl px-4 py-2 text-sm min-h-[40px] bg-gray-900 text-white max-w-[80%]">
-                        <div className="whitespace-pre-wrap leading-6">{m.content}</div>
+                        <div className="whitespace-pre-wrap leading-6">{content}</div>
                         {/* Speech bubble tail */}
                         <svg width="18" height="14" viewBox="0 0 18 14" className="absolute -bottom-[0.5px] right-[2.5px] translate-x-1/2 fill-gray-900">
                           <path d="M0.866025 8.80383L11.2583 0.803833C11.2583 0.803833 12.0621 9.5 17.2583 13.1961C12.0621 13.1961 0.866025 8.80383 0.866025 8.80383Z" />
@@ -420,12 +335,61 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                 }
 
                 if (m.role === "assistant") {
-                  return (
-                    <div key={idx} className="max-w-[95%] text-sm leading-relaxed py-4">
-                      <Steps events={m.events} />
-                      <div className="whitespace-pre-wrap leading-6 text-gray-800">{m.content}</div>
+                  const content = getTextContent(m);
+                  const steps = getSteps(m);
+                  const sources = getSources(m);
+                  const pendingTool = getPendingTool(m);
 
-                      {m.sources && (m.sources.docs.length > 0 || m.sources.dictionary.length > 0) && (
+                  return (
+                    <div key={m.id} className="max-w-[95%] text-sm leading-relaxed py-4">
+                      <Steps steps={steps} />
+
+                      {/* Pending Tool Approval */}
+                      {pendingTool && (
+                        <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-3 shadow-sm my-4">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-amber-800">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            Action Required: {pendingTool.toolName}
+                          </div>
+                          <pre className="text-[11px] bg-white border border-amber-100 p-2 rounded max-h-32 overflow-auto font-mono whitespace-pre-wrap">
+                            {JSON.stringify(pendingTool.toolInput, null, 2)}
+                          </pre>
+                          {(() => {
+                            const approvalStatus = pendingApprovals.get(pendingTool.approvalId)?.status || "pending";
+                            if (approvalStatus === "pending") {
+                              return (
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => approve(pendingTool.approvalId, pendingTool.toolName, pendingTool.toolInput)}
+                                    disabled={isLoading}
+                                    className="flex-1 bg-white border border-gray-200 py-1.5 rounded text-xs font-medium hover:bg-gray-50 shadow-sm"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={() => reject(pendingTool.approvalId)}
+                                    disabled={isLoading}
+                                    className="flex-1 bg-white border border-gray-200 py-1.5 rounded text-xs font-medium hover:bg-gray-50 shadow-sm text-red-600"
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className={`text-[11px] font-medium ${approvalStatus === 'approved' ? 'text-green-600' : 'text-red-600'}`}>
+                                {approvalStatus === "approved" ? "✓ Request Approved" : "✕ Request Rejected"}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      <div className="whitespace-pre-wrap leading-6 text-gray-800">{content}</div>
+
+                      {sources && (sources.docs.length > 0 || sources.dictionary.length > 0) && (
                         <div className="mt-4 pt-3 border-t border-gray-100">
                           <div className="flex items-center gap-1.5 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -434,7 +398,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                             ที่มาของข้อมูล
                           </div>
                           <div className="flex flex-wrap gap-1.5">
-                            {m.sources.docs.map((doc, dIdx) => (
+                            {sources.docs.map((doc, dIdx) => (
                               <a
                                 key={dIdx}
                                 href={doc.url}
@@ -445,7 +409,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                                 {doc.title}
                               </a>
                             ))}
-                            {m.sources.dictionary.map((dict, dIdx) => (
+                            {sources.dictionary.map((dict, dIdx) => (
                               <span
                                 key={dIdx}
                                 title={dict.title}
@@ -458,9 +422,8 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                         </div>
                       )}
 
-
                       {/* Feedback buttons - only show if there is content */}
-                      {m.content && m.content.trim().length > 0 && (
+                      {content && content.trim().length > 0 && (
                         <div className="mt-2 flex items-center gap-0.5">
                           <div className="flex items-center gap-0.5">
                             <button className="p-2 hover:bg-gray-100 rounded-md text-gray-500 transition-colors" aria-label="Thumb up">
@@ -485,94 +448,14 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                   );
                 }
 
-                if (m.role === "tool") {
-                  return (
-                    <div key={idx} className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2 my-4">
-                      <div className="flex items-center gap-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                        <svg viewBox="0 0 16 16" height="16" width="16" fill="currentColor" className="text-gray-900">
-                          <path fillRule="evenodd" clipRule="evenodd" d="M11 1.5H5C4.44772 1.5 4 1.94772 4 2.5V13.4732L7.16201 11.7485C7.68434 11.4635 8.31566 11.4635 8.83799 11.7485L12 13.4732V2.5C12 1.94772 11.5523 1.5 11 1.5ZM13.5 14.2914V2.5C13.5 1.11929 12.3807 0 11 0H5C3.61929 0 2.5 1.11929 2.5 2.5V14.2914V16L4 15.1818L7.88029 13.0653C7.95491 13.0246 8.04509 13.0246 8.11971 13.0653L12 15.1818L13.5 16V14.2914Z" />
-                        </svg>
-                        Source: {m.toolName}
-                      </div>
-                      <pre className="text-xs text-gray-600 overflow-auto max-h-40 whitespace-pre-wrap">
-                        {m.content}
-                      </pre>
-                    </div>
-                  );
-                }
-
-                if (m.role === "approval") {
-                  return (
-                    <div key={idx} className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-3 shadow-sm my-4">
-                      <div className="flex items-center gap-2 text-xs font-semibold text-amber-800">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        Action Required: {m.toolName}
-                      </div>
-                      <pre className="text-[11px] bg-white border border-amber-100 p-2 rounded max-h-32 overflow-auto font-mono whitespace-pre-wrap">
-                        {JSON.stringify(m.input, null, 2)}
-                      </pre>
-                      {m.sources && (m.sources.docs.length > 0 || m.sources.dictionary.length > 0) && (
-                        <div className="pt-2 border-t border-amber-100">
-                          <div className="flex flex-wrap gap-1.5">
-                            {m.sources.docs.map((doc, dIdx) => (
-                              <a
-                                key={dIdx}
-                                href={doc.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center px-1.5 py-0.5 rounded bg-white text-blue-700 text-[10px] font-medium border border-blue-100"
-                              >
-                                {doc.title}
-                              </a>
-                            ))}
-                            {m.sources.dictionary.map((dict, dIdx) => (
-                              <span
-                                key={dIdx}
-                                title={dict.title}
-                                className="inline-flex items-center px-1.5 py-0.5 rounded bg-white text-purple-700 text-[10px] font-medium border border-purple-100"
-                              >
-                                DB: {dict.table}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {m.status === "pending" ? (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => approve(m.approvalId)}
-                            disabled={loading}
-                            className="flex-1 bg-white border border-gray-200 py-1.5 rounded text-xs font-medium hover:bg-gray-50 shadow-sm"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => reject(m.approvalId)}
-                            disabled={loading}
-                            className="flex-1 bg-white border border-gray-200 py-1.5 rounded text-xs font-medium hover:bg-gray-50 shadow-sm text-red-600"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      ) : (
-                        <div className={`text-[11px] font-medium ${m.status === 'approved' ? 'text-green-600' : 'text-red-600'}`}>
-                          {m.status === "approved" ? "✓ Request Approved" : "✕ Request Rejected"}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-
                 return null;
               })}
 
-              {loading && (
+              {isLoading && (
                 <div className="py-4">
                   <Thinking thought={(() => {
                     const last = messages[messages.length - 1];
-                    return last?.role === "assistant" ? last.events?.filter(e => e.type === "thinking").pop()?.content : undefined;
+                    return last?.role === "assistant" ? getThinkingContent(last) : undefined;
                   })()} />
                 </div>
               )}
@@ -583,10 +466,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
           <div className="p-4">
             <div className="pb-2 pt-2 cursor-text border border-gray-300 rounded-xl shadow-sm focus-within:border-gray-500 transition-colors duration-250">
               <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  send(input);
-                }}
+                onSubmit={handleSubmit}
                 className="flex flex-col items-center gap-2"
               >
                 <textarea
@@ -595,18 +475,18 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      send(input);
+                      handleSubmit();
                     }
                   }}
                   placeholder="Ask a question..."
                   className="flex bg-transparent py-2 text-sm w-full resize-none rounded-none shadow-none outline-none ring-0 min-h-0 placeholder:text-gray-500 focus-visible:ring-0 px-4"
                   style={{ height: '56px' }}
-                  disabled={loading}
+                  disabled={isLoading}
                 />
                 <div className="items-center w-full px-2 flex justify-end">
                   <button
                     type="submit"
-                    disabled={loading || !input.trim()}
+                    disabled={isLoading || !input.trim()}
                     aria-label="Submit"
                     className="p-2 rounded-md bg-gray-900 text-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
                   >

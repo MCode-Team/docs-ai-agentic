@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.19",
+    "@ai-sdk/react": "^3.0.52",
     "@faker-js/faker": "^10.2.0",
     "@paralleldrive/cuid2": "^3.3.0",
     "@tailwindcss/postcss": "^4.1.18",

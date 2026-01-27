@@ -1,15 +1,7 @@
-# ---- Base Stage ----
-FROM node:24-bullseye AS base
-WORKDIR /app
+# Use a Debian-based Node.js image
+FROM node:24-bullseye
 
-# Install Bun
-ENV BUN_INSTALL="/root/.bun"
-ENV PATH="$BUN_INSTALL/bin:$PATH"
-RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.6"
-
-# ---- Dependencies Stage ----
-FROM base AS deps
-# Install system dependencies requested (for font rendering and build tools)
+# Install dependencies required by PhantomJS and necessary tools
 RUN apt-get update && apt-get install -y \
     build-essential \
     libfontconfig1 \
@@ -24,66 +16,45 @@ RUN apt-get update && apt-get install -y \
     bash \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package.json bun.lock* ./
-RUN bun install --frozen-lockfile
-
-# ---- Builder Stage ----
-FROM deps AS builder
-WORKDIR /app
+# Install Bun as 'appuser'
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.6"
 
 # Set additional environment variables
 ENV NODE_ENV=production
 ENV TZ=Asia/Bangkok
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0
 
-# Build time environment variable
+# Set Bun environment variables
+ENV BUN_INSTALL="/root/.bun"
+ENV PATH="$BUN_INSTALL/bin:$PATH"
+
+# เพิ่ม build time เป็น environment variable
 ARG BUILD_TIME
 ENV NEXT_PUBLIC_BUILD_TIME=$BUILD_TIME
 
-COPY . .
-
-# Generate Prisma client if needed (uncomment if using Prisma)
-# RUN bunx prisma generate
-
-RUN bun run build
-
-# ---- Production Stage ----
-FROM node:24-bullseye-slim AS runner
+# Set the working directory
 WORKDIR /app
 
-# Install Bun binary globally
-COPY --from=oven/bun:1.3.6 /usr/local/bin/bun /usr/local/bin/bun
+# Copy only the package files to leverage Docker layer caching
+COPY package.json ./
 
-ENV NODE_ENV=production
-ENV TZ=Asia/Bangkok
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+# Install project dependencies using Bun
+RUN bun install
 
-# Install runtime system dependencies (minimal for production)
-RUN apt-get update && apt-get install -y \
-    libfontconfig1 \
-    libfreetype6 \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Copy the rest of your application code
+COPY . .
 
-# Create non-root user
-RUN groupadd --system --gid 1001 bunjs && \
-    useradd --system --uid 1001 nextjs
 
-# Copy necessary files from builder
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+# Build the application
+RUN bun run build
 
-# Set ownership
-RUN chown -R nextjs:bunjs /app
-
-USER nextjs
-
+# Expose port
 EXPOSE 3000
 
 # Add health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/api/health || exit 1
+    CMD curl -f http://localhost:3000/health || exit 1
 
-CMD ["bun", "server.js"]
+# Specify the command to run your application
+CMD ["bun", "start"]

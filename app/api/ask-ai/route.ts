@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getOrCreateUser, getUserPreferences } from "@/lib/user";
 import {
@@ -6,13 +5,16 @@ import {
   runAgentLoop,
   type AgentState,
 } from "@/lib/agent";
-import { getMessages, addMessage } from "@/lib/memory";
 import { retrieveDocs } from "@/lib/retrieval-docs";
 import { retrieveDictionary } from "@/lib/retrieval-dictionary";
 import { rerankZeroRank2 } from "@/lib/rerank-zerank2";
-// export const runtime = "nodejs"; // Streaming preferred on edge or node with streaming support
-export const maxDuration = 60; // Allow longer timeout for agent loop
+import {
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  generateId,
+} from "ai";
 
+export const maxDuration = 60;
 
 const USER_COOKIE_NAME = "user_code";
 
@@ -27,11 +29,7 @@ const agentStates = new Map<string, AgentState>();
  * - conversationId?: string (optional, will create new if not provided)
  * - agentic?: boolean (use agentic mode, default: true)
  * 
- * Returns:
- * - { type: "answer", content, sources, conversationId }
- * - { type: "pendingTool", approvalId, toolName, input, conversationId }
- * - { type: "plan", steps, conversationId }
- * - { type: "thinking", content }
+ * Returns: Vercel AI SDK UI Message Stream
  */
 export async function POST(req: Request) {
   const cookieStore = await cookies();
@@ -54,12 +52,10 @@ export async function POST(req: Request) {
 
   // Set cookie if new user
   if (!cookieStore.get(USER_COOKIE_NAME)?.value) {
-    response.cookies.set(USER_COOKIE_NAME, userCode, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365,
-    });
+    response.headers.set(
+      "Set-Cookie",
+      `${USER_COOKIE_NAME}=${userCode}; HttpOnly; ${process.env.NODE_ENV === "production" ? "Secure; " : ""}SameSite=Lax; Max-Age=${60 * 60 * 24 * 365}; Path=/`
+    );
   }
 
   return response;
@@ -67,9 +63,7 @@ export async function POST(req: Request) {
 
 /**
  * Agentic mode with planning, memory, and reflection
- */
-/**
- * Agentic mode with planning, memory, and reflection
+ * Uses Vercel AI SDK streaming format
  */
 async function handleAgenticMode(
   userId: string,
@@ -81,60 +75,142 @@ async function handleAgenticMode(
   const state = await initAgentState(userId, conversationId, question);
   agentStates.set(state.conversationId, state);
 
-  // Get user preferences
-  const prefs = await getUserPreferences(userId);
+  // Build sources
+  const sources = await buildSources(question);
 
-  // Create a stream
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder();
+  const stream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      const textId = generateId();
 
       try {
+        // Start the message
+        writer.write({
+          type: "start",
+          messageId: generateId(),
+        });
+
         // Run agent loop and stream events
         for await (const event of runAgentLoop(state)) {
-          // Send event chunk
-          controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+          // Handle different event types
+          switch (event.type) {
+            case "thinking":
+              // Write as data part for thinking state
+              writer.write({
+                type: "data-thinking",
+                id: generateId(),
+                data: { content: event.content },
+              } as any);
+              break;
 
-          if (event.type === "tool_pending") {
-            // Include sources with pending tool
-            const sources = await buildSources(question);
-            controller.enqueue(encoder.encode(JSON.stringify({
-              type: "pendingTool",
-              approvalId: event.approvalId,
-              toolName: event.toolName,
-              input: event.toolInput,
-              sources
-            }) + "\n"));
-            controller.close();
-            return;
+            case "plan_created":
+              writer.write({
+                type: "data-plan",
+                id: generateId(),
+                data: { plan: event.content },
+              } as any);
+              break;
+
+            case "step_started":
+              writer.write({
+                type: "data-step",
+                id: generateId(),
+                data: {
+                  stepIndex: event.stepIndex,
+                  step: event.step as unknown as Record<string, unknown>,
+                },
+              } as any);
+              break;
+
+            case "tool_pending":
+              // Write pending tool approval request
+              writer.write({
+                type: "data-tool-pending",
+                id: generateId(),
+                data: {
+                  approvalId: event.approvalId!,
+                  toolName: event.toolName!,
+                  toolInput: event.toolInput,
+                  sources,
+                },
+              } as any);
+              // Finish and stop streaming - waiting for approval
+              writer.write({ type: "finish", finishReason: "stop" });
+              return;
+
+            case "tool_result":
+              writer.write({
+                type: "data-tool-result",
+                id: generateId(),
+                data: {
+                  toolName: event.toolName!,
+                  toolOutput: event.toolOutput,
+                },
+              } as any);
+              break;
+
+            case "answer":
+              // Stream the actual text content using text-start, text-delta, text-end
+              writer.write({ type: "text-start", id: textId });
+              writer.write({ type: "text-delta", id: textId, delta: event.content });
+              writer.write({ type: "text-end", id: textId });
+              break;
+
+            case "reflection":
+              writer.write({
+                type: "data-reflection",
+                id: generateId(),
+                data: { content: event.content },
+              } as any);
+              break;
+
+            case "error":
+              writer.write({
+                type: "data-error",
+                id: generateId(),
+                data: { error: event.error! },
+              } as any);
+              break;
+
+            case "complete":
+              writer.write({
+                type: "data-complete",
+                id: generateId(),
+                data: {
+                  conversationId: event.content,
+                  sources,
+                },
+              } as any);
+              break;
           }
         }
 
-        // Final answer and sources
-        const sources = await buildSources(question);
-        controller.enqueue(encoder.encode(JSON.stringify({
-          type: "finish",
-          sources
-        }) + "\n"));
+        // Final sources
+        writer.write({
+          type: "data-sources",
+          id: generateId(),
+          data: sources,
+        } as any);
 
-        controller.close();
-      } catch (error: any) {
+        // Finish the stream
+        writer.write({ type: "finish", finishReason: "stop" });
+
+      } catch (error: unknown) {
         console.error("Agent Loop Error:", error);
-        controller.enqueue(encoder.encode(JSON.stringify({
-          type: "error",
-          error: error.message
-        }) + "\n"));
-        controller.close();
+        writer.write({
+          type: "data-error",
+          id: generateId(),
+          data: { error: error instanceof Error ? error.message : "Unknown error" },
+        } as any);
+        writer.write({ type: "finish", finishReason: "error" });
       }
-    }
+    },
+    onError: (error) => {
+      console.error("Stream error:", error);
+      return error instanceof Error ? error.message : "Unknown error";
+    },
   });
 
-  return new NextResponse(stream, {
-    headers: {
-      "Content-Type": "application/x-ndjson",
-      "Transfer-Encoding": "chunked"
-    }
-  });
+  return createUIMessageStreamResponse({ stream });
 }
 
 /**
@@ -145,11 +221,7 @@ async function handleSimpleMode(
   messages: { role: string; content: string }[]
 ) {
   const { openai } = await import("@ai-sdk/openai");
-  const { generateText } = await import("ai");
-  const { createPendingToolCall } = await import("@/lib/approval/runtime");
-  const { toolRegistry } = await import("@/lib/tools/registry");
-  type ToolName = import("@/lib/tools/registry").ToolName;
-  const crypto = await import("crypto");
+  const { streamText } = await import("ai");
 
   const sources = await buildSources(question);
 
@@ -161,95 +233,28 @@ async function handleSimpleMode(
     .map((d, i) => `# DB ${i + 1}\n${d.title}\nTable: ${d.table}`)
     .join("\n---\n");
 
-  const formattedMessages = messages.map(m => ({
-    role: m.role as "user" | "assistant" | "system" | "tool",
+  // Convert messages to model messages format
+  const modelMessages = messages.map(m => ({
+    role: m.role as "user" | "assistant" | "system",
     content: m.content
   }));
 
-  const result = await generateText({
-    model: openai("gpt-5-mini"),
+  const result = streamText({
+    model: openai("gpt-4o-mini"),
     system: `
 คุณคือ Ask AI สำหรับ Docs + PostgreSQL
+ตอบคำถามตามข้อมูลที่ให้มา
 
-ห้าม execute tool เองทันที
-ถ้าต้องการเรียก tool ให้ตอบเป็น JSON เท่านั้น:
+Docs Context:
+${docsContext}
 
-{
-  "action": "tool",
-  "toolName": "ชื่อTool",
-  "input": { ... },
-  "postToolMessage": "ข้อความที่จะให้ตอบต่อหลังได้ผล tool"
-}
-
-ถ้าไม่ต้องเรียก tool ให้ตอบ:
-
-{
-  "action": "answer",
-  "content": "คำตอบ..."
-}
-
-Tools ที่มี:
-- getSalesSummary(dateFrom,dateTo)
-- getOrderStatusCounts(dateFrom,dateTo)
-- analyzeData(rows, groupBy, sumField, topN)
-- exportExcelDynamic(filename, sheets, styles, conditionalRules)
-- getOrders(dateFrom, dateTo, limit)
+DB Dictionary Context:
+${dictContext}
     `.trim(),
-    messages: [
-      ...(formattedMessages as any),
-      { role: "system", content: `Docs Context:\n${docsContext}` },
-      { role: "system", content: `DB Dictionary Context:\n${dictContext}` },
-    ],
+    messages: modelMessages,
   });
 
-  let parsed: { action?: string; content?: string; toolName?: string; input?: unknown; postToolMessage?: string };
-  try {
-    parsed = JSON.parse(result.text);
-  } catch {
-    return NextResponse.json({ type: "answer", content: result.text, sources });
-  }
-
-  if (parsed.action === "answer") {
-    return NextResponse.json({
-      type: "answer",
-      content: parsed.content ?? "",
-      sources,
-    });
-  }
-
-  if (parsed.action === "tool") {
-    const toolName = parsed.toolName as ToolName;
-    if (!toolRegistry[toolName]) {
-      return NextResponse.json({
-        type: "answer",
-        content: `ไม่พบ Tool: ${toolName}`,
-        sources,
-      });
-    }
-
-    const approvalId = crypto.randomUUID();
-    const pending = await createPendingToolCall({
-      id: approvalId,
-      toolName,
-      input: (parsed.input ?? {}) as Record<string, unknown>,
-      createdAt: Date.now(),
-    });
-
-    return NextResponse.json({
-      type: "pendingTool",
-      approvalId: pending.id,
-      toolName: pending.toolName,
-      input: pending.input,
-      postToolMessage: parsed.postToolMessage ?? "ช่วยสรุปผลจาก tool output ให้หน่อย",
-      sources,
-    });
-  }
-
-  return NextResponse.json({
-    type: "answer",
-    content: "ไม่สามารถประมวลผลได้",
-    sources,
-  });
+  return result.toUIMessageStreamResponse();
 }
 
 /**
