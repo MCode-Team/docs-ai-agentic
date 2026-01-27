@@ -33,7 +33,8 @@ const MAX_ITERATIONS = 10;
 export async function initAgentState(
     userId: string,
     conversationId: string | null,
-    query: string
+    query: string,
+    sources?: AgentState["sources"]
 ): Promise<AgentState> {
     // Get or create conversation
     let convId = conversationId;
@@ -57,6 +58,7 @@ export async function initAgentState(
         isComplete: false,
         executionHistory: [],
         attemptCount: 0,
+        sources,
     };
 }
 
@@ -67,20 +69,35 @@ async function buildPlannerContext(
     state: AgentState,
     lastError?: string
 ): Promise<PlannerContext> {
-    // Retrieve docs
-    const docsCandidates = await retrieveDocs(state.query, 12);
-    const docsReranked = await rerankZeroRank2(
-        state.query,
-        docsCandidates.map((c) => ({ id: c.id, text: c.content, meta: c }))
-    );
-    const topDocs = docsReranked
-        .slice(0, 4)
-        .map((x) => x.meta)
-        .filter((m): m is NonNullable<typeof m> => !!m);
+    const { sources } = state;
 
-    // Retrieve dictionary
-    const dictCandidates = await retrieveDictionary(state.query, 8);
-    const topDict = dictCandidates.slice(0, 4);
+    // Use pre-fetched docs or retrieve new ones
+    const topDocs = sources?.docs.map(d => ({
+        title: d.title,
+        content: d.content,
+        url: d.url
+    })) ?? await (async () => {
+        const docsCandidates = await retrieveDocs(state.query, 12);
+        const docsReranked = await rerankZeroRank2(
+            state.query,
+            docsCandidates.map((c) => ({ id: c.id, text: c.content, meta: c }))
+        );
+        return docsReranked
+            .slice(0, 4)
+            .map((x) => x.meta)
+            .filter((m): m is NonNullable<typeof m> => !!m);
+    })();
+
+    // Use pre-fetched dictionary or retrieve new ones
+    const topDict = sources?.dictionary.map(d => ({
+        title: d.title,
+        schema_name: d.table.split('.')[0] || 'public',
+        table_name: d.table.split('.')[1] || d.table,
+        column_name: d.column
+    })) ?? await (async () => {
+        const dictCandidates = await retrieveDictionary(state.query, 8);
+        return dictCandidates.slice(0, 4);
+    })();
 
     // Retrieve user facts
     const userFacts = await getUserFacts(state.userId, 10);

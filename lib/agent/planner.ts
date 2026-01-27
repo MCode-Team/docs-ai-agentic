@@ -102,7 +102,7 @@ ${toolDescriptions}
 `.trim();
 
     const result = await generateText({
-        model: openai("gpt-5-mini"),
+        model: openai("gpt-5-nano"),
         system: PLANNER_SYSTEM_PROMPT,
         messages: [{ role: "user", content: userContext }],
     });

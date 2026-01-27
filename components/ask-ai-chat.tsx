@@ -3,7 +3,7 @@
 import { useChat, type UIMessage } from "@ai-sdk/react";
 import { isTextUIPart, isDataUIPart, DefaultChatTransport } from "ai";
 import { useState, useMemo } from "react";
-import { ChevronDown, ChevronRight, PlayCircle, CheckCircle2, BrainCircuit, Sparkles, Send, Trash2, Share2, Copy, X, CornerDownLeft, ArrowDown } from "lucide-react";
+import { ChevronDown, ChevronRight, PlayCircle, CheckCircle2, BrainCircuit, Sparkles, Send, Trash2, Share2, Copy, X, CornerDownLeft, ArrowDown, Square } from "lucide-react";
 import { useStickToBottom } from "use-stick-to-bottom";
 
 interface AskAIChatProps {
@@ -181,20 +181,38 @@ function Steps({ steps }: { steps: Array<{ type: string; data: Record<string, un
       {isOpen && (
         <div className="px-3 pb-3 pt-1 space-y-2.5 border-t border-gray-100/50">
           {steps.map((step, idx) => {
+            const currentTimestamp = (step.data as any).timestamp as number | undefined;
+            const nextStep = steps[idx + 1];
+            const nextTimestamp = (nextStep?.data as any)?.timestamp as number | undefined;
+
+            let duration = "";
+            if (currentTimestamp && nextTimestamp) {
+              const diff = nextTimestamp - currentTimestamp;
+              if (diff > 0) {
+                duration = `${(diff / 1000).toFixed(1)}s`;
+              }
+            }
+
             if (step.type === "data-thinking") {
               return (
-                <div key={idx} className="text-[11px] text-gray-600 flex items-start gap-2.5 pl-1">
-                  <div className="w-1 h-1 rounded-full bg-gray-300 mt-1.5 shrink-0" />
-                  <span className="italic leading-relaxed">{(step.data as { content?: string }).content}</span>
+                <div key={idx} className="text-[11px] text-gray-600 flex items-start gap-2.5 pl-1 justify-between group">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-1 h-1 rounded-full bg-gray-300 mt-1.5 shrink-0" />
+                    <span className="italic leading-relaxed">{(step.data as { content?: string }).content}</span>
+                  </div>
+                  {duration && <span className="text-[10px] text-gray-400 font-mono shrink-0">{duration}</span>}
                 </div>
               );
             }
             if (step.type === "data-step") {
               const stepData = step.data as { step?: { type?: string; toolName?: string } };
               return (
-                <div key={idx} className="text-[11px] text-gray-700 flex items-center gap-2.5 pl-1">
-                  <PlayCircle className="w-3 h-3 text-blue-500 shrink-0" />
-                  <span className="font-mono bg-white px-1 rounded border border-gray-100">Step: {stepData.step?.toolName || stepData.step?.type}</span>
+                <div key={idx} className="text-[11px] text-gray-700 flex items-center gap-2.5 pl-1 justify-between group">
+                  <div className="flex items-center gap-2.5">
+                    <PlayCircle className="w-3 h-3 text-blue-500 shrink-0" />
+                    <span className="font-mono bg-white px-1 rounded border border-gray-100">Step: {stepData.step?.toolName || stepData.step?.type}</span>
+                  </div>
+                  {duration && <span className="text-[10px] text-gray-400 font-mono shrink-0">{duration}</span>}
                 </div>
               );
             }
@@ -244,7 +262,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
 
   const transport = useMemo(() => new AskAIChatTransport(), []);
 
-  const { messages, sendMessage, status, setMessages } = useChat({
+  const { messages, sendMessage, status, setMessages, stop } = useChat({
     id: "ask-ai-chat",
     transport,
   });
@@ -563,14 +581,25 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                   {input.length} / 1000
                 </div>
                 <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                  <button
-                    type="submit"
-                    disabled={isLoading || !input.trim()}
-                    aria-label="Submit"
-                    className="flex items-center justify-center size-8 rounded-lg bg-[#006cff] text-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-all hover:bg-blue-700 shadow-sm"
-                  >
-                    <CornerDownLeft className="size-4" />
-                  </button>
+                  {isLoading ? (
+                    <button
+                      type="button"
+                      onClick={() => stop()}
+                      aria-label="Stop generating"
+                      className="flex items-center justify-center size-8 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all shadow-sm animate-in fade-in zoom-in duration-200"
+                    >
+                      <Square className="size-3.5 fill-current" />
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={!input.trim()}
+                      aria-label="Submit"
+                      className="flex items-center justify-center size-8 rounded-lg bg-[#006cff] text-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-all hover:bg-blue-700 shadow-sm"
+                    >
+                      <CornerDownLeft className="size-4" />
+                    </button>
+                  )}
                 </div>
               </form>
             </div>

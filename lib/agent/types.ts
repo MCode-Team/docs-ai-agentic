@@ -41,6 +41,11 @@ export interface AgentState {
     }>;
     /** Current iteration count to prevent infinite loops */
     attemptCount: number;
+    /** Pre-fetched sources to avoid double retrieval */
+    sources?: {
+        docs: { title: string; url: string; content: string; }[];
+        dictionary: { title: string; table: string; column: string; }[];
+    };
 }
 
 export type AgentEventType =

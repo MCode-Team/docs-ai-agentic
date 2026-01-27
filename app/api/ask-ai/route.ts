@@ -71,30 +71,36 @@ async function handleAgenticMode(
   question: string,
   messages: { role: string; content: string }[]
 ) {
-  // Initialize agent state
-  const state = await initAgentState(userId, conversationId, question);
-  agentStates.set(state.conversationId, state);
-
-  // Build sources
-  const sources = await buildSources(question);
-
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
       const textId = generateId();
 
       try {
-        // Start the message
+        // Start the message container
         writer.write({
           type: "start",
           messageId: generateId(),
         });
 
-        // Run agent loop and stream events
+        // 1. Acknowledge request immediately
+        writer.write({
+          type: "data-thinking",
+          id: generateId(),
+          data: { content: "Reading documents...", timestamp: Date.now() },
+        } as any);
+
+        // 2. Fetch sources (Blocking operation moved inside stream)
+        const sources = await buildSources(question);
+
+        // 3. Initialize agent state with pre-fetched sources
+        const state = await initAgentState(userId, conversationId, question, sources);
+        agentStates.set(state.conversationId, state);
+
+        // 4. Run agent loop
         for await (const event of runAgentLoop(state)) {
           // Handle different event types
           switch (event.type) {
             case "thinking":
-              // Write as data part for thinking state
               writer.write({
                 type: "data-thinking",
                 id: generateId(),
@@ -117,6 +123,7 @@ async function handleAgenticMode(
                 data: {
                   stepIndex: event.stepIndex,
                   step: event.step as unknown as Record<string, unknown>,
+                  timestamp: Date.now(),
                 },
               } as any);
               break;
@@ -130,7 +137,10 @@ async function handleAgenticMode(
                   approvalId: event.approvalId!,
                   toolName: event.toolName!,
                   toolInput: event.toolInput,
-                  sources,
+                  sources: {
+                    docs: sources.docs.map(d => ({ title: d.title, url: d.url })),
+                    dictionary: sources.dictionary.map(d => ({ title: d.title, table: d.table }))
+                  },
                 },
               } as any);
               // Finish and stop streaming - waiting for approval
@@ -177,19 +187,15 @@ async function handleAgenticMode(
                 id: generateId(),
                 data: {
                   conversationId: event.content,
-                  sources,
+                  sources: {
+                    docs: sources.docs.map(d => ({ title: d.title, url: d.url })),
+                    dictionary: sources.dictionary.map(d => ({ title: d.title, table: d.table }))
+                  },
                 },
               } as any);
               break;
           }
         }
-
-        // Final sources
-        writer.write({
-          type: "data-sources",
-          id: generateId(),
-          data: sources,
-        } as any);
 
         // Finish the stream
         writer.write({ type: "finish", finishReason: "stop" });
@@ -240,7 +246,7 @@ async function handleSimpleMode(
   }));
 
   const result = streamText({
-    model: openai("gpt-4o-mini"),
+    model: openai("gpt-5-nano"),
     system: `
 คุณคือ Ask AI สำหรับ Docs + PostgreSQL
 ตอบคำถามตามข้อมูลที่ให้มา
@@ -275,10 +281,15 @@ async function buildSources(question: string) {
   const topDict = dictCandidates.slice(0, 4);
 
   return {
-    docs: topDocs.map((d) => ({ title: d.title, url: d.url })),
+    docs: topDocs.map((d) => ({
+      title: d.title,
+      url: d.url,
+      content: d.content
+    })),
     dictionary: topDict.map((d) => ({
       title: d.title,
       table: `${d.schema_name}.${d.table_name}`,
+      column: d.column_name || "*"
     })),
   };
 }
