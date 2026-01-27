@@ -6,7 +6,8 @@
 
 ![System Architecture](./system-architecture.jpg)
 
-<video controls src="./AI_Agentic_Docs.mp4" width="100%"></video>
+## 🎥 Watch the Video
+[![Demo](https://img.youtube.com/vi/SzqdP7sjykY/0.jpg)](https://www.youtube.com/watch?v=SzqdP7sjykY)
 
 ## 🌟 ฟีเจอร์หลัก (Key Features)
 
