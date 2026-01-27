@@ -4,7 +4,10 @@
 
 An advanced AI-powered documentation and database assistant built with Next.js, Vercel AI SDK, and PostgreSQL (pgvector). This project demonstrates a **hybrid agentic architecture** capable of answering complex queries by retrieving information from both written documentation and database schemas.
 
-![System Architecture](./system-architecture.jpg)
+![System Architecture](./Al-Agentic-Docs.png)
+
+## 🎥 Watch the Video
+[![Demo](https://img.youtube.com/vi/SzqdP7sjykY/0.jpg)](https://www.youtube.com/watch?v=SzqdP7sjykY)
 
 ## 🌟 Key Features
 
