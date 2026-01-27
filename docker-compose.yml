@@ -9,8 +9,10 @@ services:
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SANDBOX_URL=http://sandbox:8000
     depends_on:
       - db
+      - sandbox
     restart: unless-stopped
 
   db:
@@ -47,6 +49,28 @@ services:
       retries: 3
       start_period: 300s
 
+  sandbox:
+    build:
+      context: ./sandbox
+      dockerfile: Dockerfile
+    container_name: python-sandbox
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    # Resource limits for security
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
 volumes:
   postgres_data:
   zerank_cache:
+
