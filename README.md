@@ -4,7 +4,7 @@
 
 ผู้ช่วยอัจฉริยะเพื่อการจัดการเอกสารและฐานข้อมูล (AI-powered documentation and database assistant) ที่พัฒนาด้วย Next.js, Vercel AI SDK และ PostgreSQL (pgvector) โปรเจคนี้แสดงให้เห็นถึง **สถาปัตยกรรม Agentic แบบลูกผสม (Hybrid Agentic Architecture)** ที่สามารถตอบคำถามซับซ้อนโดยการดึงข้อมูลจากทั้งเอกสารและโครงสร้างฐานข้อมูล (Database Schema)
 
-![System Architecture](./system-architecture.jpg)
+![System Architecture](./Al-Agentic-Docs.png)
 
 ## 🎥 Watch the Video
 [![Demo](https://img.youtube.com/vi/SzqdP7sjykY/0.jpg)](https://www.youtube.com/watch?v=SzqdP7sjykY)
