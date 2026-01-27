@@ -103,18 +103,24 @@ function getTextContent(message: UIMessage): string {
   return text;
 }
 
-function StreamingText({ content, className }: { content: string; className?: string }) {
-  const [displayedContent, setDisplayedContent] = useState(content);
+// function StreamingText updated
+function StreamingText({ content, className, isStreaming: startStreaming }: { content: string; className?: string; isStreaming?: boolean }) {
+  // If we are definitely streaming (new message), start empty to animate the initial chunk.
+  // Otherwise, start with content (history).
+  const [displayedContent, setDisplayedContent] = useState(startStreaming ? "" : content);
   const [isStreaming, setIsStreaming] = useState(false);
+
+  // We need to track content for animation targets
   const targetContent = useRef(content);
-  const currentContent = useRef(content);
+  const currentContent = useRef(startStreaming ? "" : content);
 
   useEffect(() => {
     targetContent.current = content;
+    // If content grew, animate.
     if (content.length > currentContent.current.length) {
       setIsStreaming(true);
     } else if (content.length < currentContent.current.length) {
-      // Content reset/cleared
+      // Reset if content shrank (e.g. cleared)
       currentContent.current = content;
       setDisplayedContent(content);
       setIsStreaming(false);
@@ -127,10 +133,11 @@ function StreamingText({ content, className }: { content: string; className?: st
     let animationFrameId: number;
     const animate = () => {
       if (currentContent.current.length < targetContent.current.length) {
-        // Calculate chunk size based on backlog to catch up
         const diff = targetContent.current.length - currentContent.current.length;
-        const chunk = Math.max(1, Math.ceil(diff / 8));
+        // Faster speed: at least 2 chars or 1/15th of remaining
+        const chunk = Math.max(2, Math.ceil(diff / 15));
 
+        // Append chunk
         const nextSlice = targetContent.current.slice(0, currentContent.current.length + chunk);
         currentContent.current = nextSlice;
         setDisplayedContent(nextSlice);
@@ -525,6 +532,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                         {content && (
                           <StreamingText
                             content={content}
+                            isStreaming={isLoading && m.id === messages[messages.length - 1].id}
                             className="whitespace-pre-wrap leading-7 text-gray-800 text-[14px]"
                           />
                         )}
