@@ -36,3 +36,10 @@ npm run dev
 
 เปิด:
 - http://localhost:3000/docs/getting-started
+
+## Documentation
+- [System Features](content/docs/system-features.mdx) - รายละเอียดฟีเจอร์ของระบบ (Agentic AI, RAG, UI)
+- [System Architecture](content/docs/system-architecture.mdx) - แผนภาพโครงสร้างระบบและการทำงาน
+
+## System Architecture Diagram
+![System Architecture](./system-architecture.jpg)

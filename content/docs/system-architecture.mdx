@@ -1,0 +1,93 @@
+# System Architecture Diagram
+
+```mermaid
+graph TD
+    User([User])
+    
+    subgraph Frontend ["Frontend (Next.js)"]
+        UI[Ask AI Chat Component]
+        Action_Approve[Approve Tool Call]
+        Action_Reject[Reject Tool Call]
+        UI -->|Send Message| API
+        UI -->|Stream Events| User
+    end
+
+    subgraph Backend ["Backend API (/api/ask-ai)"]
+        API[Route Handler]
+        
+        subgraph Mode_Selection ["Mode Selection"]
+            CheckMode{Agentic Mode?}
+            SimpleMode[Simple Mode (RAG)]
+            AgentMode[Agentic Mode (Loop)]
+            
+            API --> CheckMode
+            CheckMode -->|No| SimpleMode
+            CheckMode -->|Yes| AgentMode
+        end
+
+        subgraph Agent_Core ["Agent Core (lib/agent)"]
+            Planner[Planner]
+            AgentLoop[Agent Loop]
+            Reflector[Reflector]
+            Memory[Memory / Conversation State]
+            
+            AgentMode --> Planner
+            Planner --> AgentLoop
+            AgentLoop <-->|Read/Write| Memory
+            AgentLoop -->|Execute| Tools
+            AgentLoop -->|Reflect| Reflector
+            Reflector --> Memory
+        end
+
+        subgraph Tools_Layer ["Tools"]
+            T_Retriever[Retrieval Tool]
+            T_Dictionary[DB Dictionary Tool]
+            T_Calculator[Calculator / Other Tools]
+            
+            Tools --> T_Retriever
+            Tools --> T_Dictionary
+            Tools --> T_Calculator
+        end
+    end
+
+    subgraph Data_Layer ["Data Layer (PostgreSQL)"]
+        VectorDocs[(docs_chunks\npgvector)]
+        VectorDict[(db_dictionary_chunks\npgvector)]
+        AppDB[(Application Data)]
+        
+        T_Retriever <--> VectorDocs
+        T_Dictionary <--> VectorDict
+        T_Dictionary -.->|Reflect Schema| AppDB
+    end
+
+    subgraph Ingestion ["Ingestion Scripts"]
+        Script_Docs[ingest-docs.ts]
+        Script_Dict[ingest-db-dictionary.ts]
+        Files_MDX[Content / Docs (.mdx)]
+        
+        Files_MDX --> Script_Docs
+        Script_Docs --> VectorDocs
+        
+        AppDB --> Script_Dict
+        Script_Dict --> VectorDict
+    end
+
+    %% Interactions
+    SimpleMode --> T_Retriever
+    SimpleMode --> T_Dictionary
+    
+    %% Human in the Loop
+    AgentLoop -.->|Request Approval| UI
+    Action_Approve -.->|Resume| AgentLoop
+    Action_Reject -.->|Resume (Reject)| AgentLoop
+
+    classDef frontend fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+    classDef backend fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+    classDef data fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef ingestion fill:#fff3e0,stroke:#ef6c00,stroke-width:2px;
+    
+    class UI,Action_Approve,Action_Reject frontend;
+    class API,SimpleMode,AgentMode,Planner,AgentLoop,Reflector,Memory,Tools,T_Retriever,T_Dictionary,T_Calculator backend;
+    class VectorDocs,VectorDict,AppDB data;
+    class Script_Docs,Script_Dict,Files_MDX ingestion;
+```

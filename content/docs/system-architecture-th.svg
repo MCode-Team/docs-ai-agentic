@@ -1,0 +1,206 @@
+<svg width="3840" height="2160" viewBox="0 0 3840 2160" xmlns="http://www.w3.org/2000/svg" style="background-color: #ffffff; font-family: 'Prompt', 'Sarabun', sans-serif;">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&amp;display=swap');
+      .title { font-size: 80px; font-weight: 600; fill: #333; text-anchor: middle; }
+      .group-label { font-size: 48px; font-weight: 600; fill: #555; }
+      .node-text { font-size: 36px; fill: #333; text-anchor: middle; dominant-baseline: middle; }
+      .edge-label { font-size: 30px; fill: #666; text-anchor: middle; background-color: white; }
+      .box { stroke-width: 3px; rx: 15; ry: 15; }
+      .frontend-box { fill: #e3f2fd; stroke: #1565c0; }
+      .backend-box { fill: #f3e5f5; stroke: #7b1fa2; }
+      .data-box { fill: #e8f5e9; stroke: #2e7d32; }
+      .ingest-box { fill: #fff3e0; stroke: #ef6c00; }
+      .group-box { fill: none; stroke-width: 4px; stroke-dasharray: 10,5; rx: 20; ry: 20; }
+      .arrow-line { stroke: #666; stroke-width: 4px; fill: none; }
+      .arrow-head { fill: #666; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" class="arrow-head" />
+    </marker>
+  </defs>
+
+  <!-- Main Title -->
+  <text x="1920" y="100" class="title">แผนภาพสถาปัตยกรรมระบบ (System Architecture)</text>
+
+  <!-- User Node -->
+  <g transform="translate(1770, 180)">
+    <circle cx="150" cy="60" r="60" fill="#eee" stroke="#333" stroke-width="3" />
+    <path d="M120,60 Q150,100 180,60" fill="none" stroke="#333" stroke-width="3" />
+    <circle cx="135" cy="45" r="5" fill="#333" />
+    <circle cx="165" cy="45" r="5" fill="#333" />
+    <text x="150" y="150" class="node-text" style="font-weight:600;">ผู้ใช้งาน (User)</text>
+  </g>
+
+  <!-- ==================== FRONTEND LAYER ==================== -->
+  <!-- Group Box -->
+  <rect x="1300" y="280" width="1240" height="350" class="frontend-box box" style="fill-opacity: 0.1;" />
+  <text x="1320" y="330" class="group-label" style="fill: #1565c0;">ส่วนหน้า (Frontend - Next.js)</text>
+  
+  <!-- Ask AI Chat Component -->
+  <g transform="translate(1620, 360)">
+    <rect width="600" height="100" class="frontend-box box" />
+    <text x="300" y="50" class="node-text">ส่วนประกอบแชท Ask AI</text>
+  </g>
+
+  <!-- Approve / Reject Actions -->
+  <g transform="translate(1350, 500)">
+    <rect width="350" height="80" class="frontend-box box" />
+    <text x="175" y="40" class="node-text" style="font-size:30px;">อนุมัติการเรียกใช้</text>
+  </g>
+  <g transform="translate(2140, 500)">
+    <rect width="350" height="80" class="frontend-box box" />
+    <text x="175" y="40" class="node-text" style="font-size:30px;">ปฏิเสธการเรียกใช้</text>
+  </g>
+
+  <!-- ==================== BACKEND LAYER ==================== -->
+  <rect x="900" y="700" width="2040" height="950" class="backend-box box" style="fill-opacity: 0.1;" />
+  <text x="940" y="760" class="group-label" style="fill: #7b1fa2;">ส่วนหลัง (Backend API - /api/ask-ai)</text>
+
+  <!-- API Route Handler -->
+  <g transform="translate(1620, 780)">
+    <rect width="600" height="80" class="backend-box box" />
+    <text x="300" y="40" class="node-text">ตัวจัดการเส้นทาง (Route Handler)</text>
+  </g>
+
+  <!-- Mode Selection Subgraph -->
+  <rect x="950" y="900" width="1940" height="250" class="group-box" style="stroke: #9c27b0;" />
+  <text x="970" y="950" class="group-label" style="font-size: 36px; fill: #9c27b0;">การเลือกโหมด</text>
+
+  <!-- Decision Diamond (Agentic Mode?) -->
+  <g transform="translate(1780, 920)">
+    <polygon points="140,0 280,80 140,160 0,80" class="backend-box box" />
+    <text x="140" y="80" class="node-text" style="font-size: 28px;">โหมดเอเจนท์?</text>
+  </g>
+
+  <!-- Simple Mode -->
+  <g transform="translate(1000, 980)">
+    <rect width="400" height="80" class="backend-box box" />
+    <text x="200" y="40" class="node-text">โหมดทั่วไป (RAG)</text>
+  </g>
+
+  <!-- Agent Mode -->
+  <g transform="translate(2440, 980)">
+    <rect width="400" height="80" class="backend-box box" />
+    <text x="200" y="40" class="node-text">โหมดเอเจนท์ (วนซ้ำ)</text>
+  </g>
+
+  <!-- Agent Core Subgraph -->
+  <rect x="950" y="1180" width="1940" height="420" class="group-box" style="stroke: #6a1b9a;" />
+  <text x="970" y="1230" class="group-label" style="font-size: 36px; fill: #6a1b9a;">แกนหลักเอเจนท์ (Agent Core)</text>
+
+  <!-- Planner -->
+  <g transform="translate(2440, 1250)">
+    <rect width="400" height="80" class="backend-box box" />
+    <text x="200" y="40" class="node-text">ผู้วางแผน (Planner)</text>
+  </g>
+
+  <!-- Agent Loop -->
+  <g transform="translate(1720, 1380)">
+    <rect width="400" height="100" class="backend-box box" style="stroke-width: 5px;" />
+    <text x="200" y="50" class="node-text" style="font-weight: 600;">ลูปการทำงาน (Loop)</text>
+  </g>
+
+  <!-- Reflector -->
+  <g transform="translate(2250, 1390)">
+    <rect width="300" height="80" class="backend-box box" />
+    <text x="150" y="40" class="node-text">ตัวสะท้อนคิด</text>
+  </g>
+
+  <!-- Memory -->
+  <g transform="translate(1250, 1390)">
+    <rect width="350" height="80" class="backend-box box" />
+    <text x="175" y="40" class="node-text">หน่วยความจำ</text>
+  </g>
+
+  <!-- Tools Subgraph -->
+  <g transform="translate(1420, 1630)"> <!-- Centered under Loop -->
+      <rect width="1000" height="100" class="group-box" style="stroke: #4a148c; fill: #f3e5f5;" />
+      <!-- Tools inside -->
+      <g transform="translate(20, 20)">
+        <rect width="300" height="60" class="backend-box box" style="fill: #fff;" />
+        <text x="150" y="30" class="node-text" style="font-size: 24px;">เครื่องมือสืบค้น (Retriever)</text>
+      </g>
+      <g transform="translate(350, 20)">
+        <rect width="300" height="60" class="backend-box box" style="fill: #fff;" />
+        <text x="150" y="30" class="node-text" style="font-size: 24px;">พจนานุกรม DB</text>
+      </g>
+      <g transform="translate(680, 20)">
+        <rect width="300" height="60" class="backend-box box" style="fill: #fff;" />
+        <text x="150" y="30" class="node-text" style="font-size: 24px;">เครื่องคิดเลข / อื่นๆ</text>
+      </g>
+  </g>
+
+  <!-- ==================== DATA LAYER ==================== -->
+  <rect x="900" y="1700" width="2040" height="350" class="data-box box" style="fill-opacity: 0.1;" />
+  <text x="940" y="1760" class="group-label" style="fill: #2e7d32;">ชั้นข้อมูล (Data Layer - PostgreSQL)</text>
+
+  <!-- VectorDocs -->
+  <g transform="translate(1100, 1850)">
+    <path d="M0,20 Q100,-20 200,20 L200,120 Q100,160 0,120 Z" class="data-box box" />
+    <path d="M0,20 Q100,60 200,20" fill="none" class="data-box" stroke-width="2" />
+    <text x="100" y="60" class="node-text" style="font-size: 24px;">เอกสารเวกเตอร์</text>
+    <text x="100" y="90" class="node-text" style="font-size: 20px;">(pgvector)</text>
+  </g>
+
+  <!-- VectorDict -->
+  <g transform="translate(1600, 1850)">
+    <path d="M0,20 Q100,-20 200,20 L200,120 Q100,160 0,120 Z" class="data-box box" />
+    <path d="M0,20 Q100,60 200,20" fill="none" class="data-box" stroke-width="2" />
+    <text x="100" y="60" class="node-text" style="font-size: 24px;">พจนานุกรมเวกเตอร์</text>
+    <text x="100" y="90" class="node-text" style="font-size: 20px;">(pgvector)</text>
+  </g>
+
+   <!-- AppDB -->
+  <g transform="translate(2100, 1850)">
+    <path d="M0,20 Q100,-20 200,20 L200,120 Q100,160 0,120 Z" class="data-box box" />
+    <path d="M0,20 Q100,60 200,20" fill="none" class="data-box" stroke-width="2" />
+    <text x="100" y="75" class="node-text" style="font-size: 24px;">ข้อมูลแอปพลิเคชัน</text>
+  </g>
+
+  <!-- ==================== CONNECTIONS ==================== -->
+  
+  <!-- User to Frontend -->
+  <path d="M1920,240 L1920,360" class="arrow-line" marker-end="url(#arrow)" />
+  <text x="2030" y="300" class="edge-label">ส่งข้อความ</text>
+  <path d="M1820,360 L1820,240" class="arrow-line" stroke-dasharray="10,5" marker-end="url(#arrow)" />
+  
+  <!-- Frontend to API -->
+  <path d="M1920,460 L1920,780" class="arrow-line" marker-end="url(#arrow)" />
+  
+  <!-- API to Mode Check -->
+  <path d="M1920,860 L1920,920" class="arrow-line" marker-end="url(#arrow)" />
+
+  <!-- Mode Check Branches -->
+  <path d="M1780,1000 L1400,1000" class="arrow-line" marker-end="url(#arrow)" /> <!-- To Simple -->
+  <text x="1600" y="990" class="edge-label">No</text>
+  
+  <path d="M2060,1000 L2440,1000" class="arrow-line" marker-end="url(#arrow)" /> <!-- To Agent -->
+  <text x="2250" y="990" class="edge-label">Yes (Agent)</text>
+  
+  <!-- Simple Mode Connects -->
+  <path d="M1200,1060 L1200,1630" class="arrow-line" marker-end="url(#arrow)" stroke-dasharray="5,5" /> <!-- Needs to go to Tools/Retriever actually -->
+
+  <!-- Agent Branch Flow -->
+  <path d="M2640,1060 L2640,1250" class="arrow-line" marker-end="url(#arrow)" /> <!-- To Planner -->
+  
+  <path d="M2640,1330 L2640,1430 L2120,1430" class="arrow-line" marker-end="url(#arrow)" /> <!-- Planner to Loop -->
+  
+  <path d="M1920,1480 L1920,1630" class="arrow-line" marker-end="url(#arrow)" /> <!-- Loop to Tools -->
+  <text x="1980" y="1550" class="edge-label">Execute</text>
+  
+  <!-- Tool Responses -->
+  <path d="M1880,1630 L1880,1480" class="arrow-line" marker-end="url(#arrow)" stroke-dasharray="5,5" />
+
+  <!-- Loop to Memory -->
+  <path d="M1720,1430 L1600,1430" class="arrow-line" marker-end="url(#arrow)" />
+  <path d="M1600,1450 L1720,1450" class="arrow-line" marker-end="url(#arrow)" />
+
+  <!-- Loop to Reflector -->
+  <path d="M2120,1430 L2250,1430" class="arrow-line" marker-end="url(#arrow)" />
+  
+  <!-- Connection to Data -->
+  <path d="M1570,1730 L1200,1730 L1200,1850" class="arrow-line" marker-end="url(#arrow)" /> <!-- Retriever -> VectorDocs -->
+  <path d="M1920,1730 L1700,1730 L1700,1850" class="arrow-line" marker-end="url(#arrow)" /> <!-- Dict -> VectorDict -->
+  
+</svg>
