@@ -104,52 +104,54 @@ function getTextContent(message: UIMessage): string {
 }
 
 // function StreamingText updated
-function StreamingText({ content, className, isStreaming: startStreaming }: { content: string; className?: string; isStreaming?: boolean }) {
-  // If we are definitely streaming (new message), start empty to animate the initial chunk.
-  // Otherwise, start with content (history).
-  const [displayedContent, setDisplayedContent] = useState(startStreaming ? "" : content);
-  const [isStreaming, setIsStreaming] = useState(false);
+function StreamingText({ content, className, isStreaming: shouldAnimate }: { content: string; className?: string; isStreaming?: boolean }) {
+  // If it's the last message (shouldAnimate), start empty to allow animation.
+  // Otherwise show full content immediately (history/old messages).
+  const [displayedContent, setDisplayedContent] = useState(shouldAnimate ? "" : content);
 
-  // We need to track content for animation targets
   const targetContent = useRef(content);
-  const currentContent = useRef(startStreaming ? "" : content);
+  const currentContent = useRef(shouldAnimate ? "" : content);
 
+  // Sync refs and handle "Snap to finish" if animation disabled
   useEffect(() => {
     targetContent.current = content;
-    // If content grew, animate.
-    if (content.length > currentContent.current.length) {
-      setIsStreaming(true);
-    } else if (content.length < currentContent.current.length) {
-      // Reset if content shrank (e.g. cleared)
+
+    if (!shouldAnimate) {
+      if (currentContent.current !== content) {
+        currentContent.current = content;
+        setDisplayedContent(content);
+      }
+      return;
+    }
+
+    // If we should animate, but content shrank (clear), reset
+    if (content.length < currentContent.current.length) {
       currentContent.current = content;
       setDisplayedContent(content);
-      setIsStreaming(false);
     }
-  }, [content]);
+  }, [content, shouldAnimate]);
 
   useEffect(() => {
-    if (!isStreaming) return;
+    if (!shouldAnimate) return;
 
     let animationFrameId: number;
     const animate = () => {
+      // Loop until we catch up
       if (currentContent.current.length < targetContent.current.length) {
         const diff = targetContent.current.length - currentContent.current.length;
-        // Faster speed: at least 2 chars or 1/15th of remaining
-        const chunk = Math.max(2, Math.ceil(diff / 15));
+        // Adaptive speed
+        const chunk = Math.max(2, Math.ceil(diff / 20)); // Slower divisor = faster catchup. 20 is smoother.
 
-        // Append chunk
         const nextSlice = targetContent.current.slice(0, currentContent.current.length + chunk);
         currentContent.current = nextSlice;
         setDisplayedContent(nextSlice);
 
         animationFrameId = requestAnimationFrame(animate);
-      } else {
-        setIsStreaming(false);
       }
     };
     animationFrameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [isStreaming]);
+  }, [shouldAnimate, content]); // Dep on content to restart loop if new data comes
 
   return (
     <div className={className}>
@@ -532,7 +534,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                         {content && (
                           <StreamingText
                             content={content}
-                            isStreaming={isLoading && m.id === messages[messages.length - 1].id}
+                            isStreaming={m.id === messages[messages.length - 1].id}
                             className="whitespace-pre-wrap leading-7 text-gray-800 text-[14px]"
                           />
                         )}
