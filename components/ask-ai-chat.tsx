@@ -3,7 +3,7 @@
 import { useChat, type UIMessage } from "@ai-sdk/react";
 import { isTextUIPart, isDataUIPart, DefaultChatTransport } from "ai";
 import { useState, useMemo, useRef, useEffect } from "react";
-import { ChevronDown, ChevronRight, PlayCircle, CheckCircle2, BrainCircuit, Sparkles, Send, Trash2, Share2, Copy, X, CornerDownLeft, ArrowDown, Square } from "lucide-react";
+import { ChevronDown, ChevronRight, PlayCircle, CheckCircle2, Sparkles, Trash2, Copy, X, CornerDownLeft, ArrowDown, Square } from "lucide-react";
 import { useStickToBottom } from "use-stick-to-bottom";
 
 interface AskAIChatProps {
@@ -12,7 +12,7 @@ interface AskAIChatProps {
 
 type MessagePart = UIMessage["parts"][number];
 
-// Type guards with proper types
+// Type guards
 function isThinkingPart(part: MessagePart): boolean {
   return isDataUIPart(part) && part.type === "data-thinking";
 }
@@ -30,7 +30,7 @@ function isToolPendingPart(part: MessagePart): boolean {
   return isDataUIPart(part) && part.type === "data-tool-pending";
 }
 
-// Extract thinking data from message parts
+// Extract thinking data
 function getThinkingContent(message: UIMessage): string | undefined {
   for (const part of message.parts) {
     if (isThinkingPart(part) && isDataUIPart(part)) {
@@ -40,7 +40,7 @@ function getThinkingContent(message: UIMessage): string | undefined {
   return undefined;
 }
 
-// Extract sources from message parts
+// Extract sources
 function getSources(message: UIMessage): { docs: { title: string; url: string }[]; dictionary: { title: string; table: string }[] } | undefined {
   for (const part of message.parts) {
     if (isSourcesPart(part) && isDataUIPart(part)) {
@@ -61,7 +61,7 @@ function getSources(message: UIMessage): { docs: { title: string; url: string }[
   return undefined;
 }
 
-// Extract steps/events from message parts
+// Extract steps
 function getSteps(message: UIMessage): Array<{ type: string; data: Record<string, unknown> }> {
   const steps: Array<{ type: string; data: Record<string, unknown> }> = [];
   for (const part of message.parts) {
@@ -72,7 +72,7 @@ function getSteps(message: UIMessage): Array<{ type: string; data: Record<string
   return steps;
 }
 
-// Extract pending tool approval from message parts
+// Extract pending tool
 function getPendingTool(message: UIMessage): {
   approvalId: string;
   toolName: string;
@@ -92,7 +92,7 @@ function getPendingTool(message: UIMessage): {
   return undefined;
 }
 
-// Get text content from message
+// Get text content
 function getTextContent(message: UIMessage): string {
   let text = "";
   for (const part of message.parts) {
@@ -103,7 +103,6 @@ function getTextContent(message: UIMessage): string {
   return text;
 }
 
-// function StreamingText updated
 function StreamingText({ content, className, isStreaming: shouldAnimate }: { content: string; className?: string; isStreaming?: boolean }) {
   // If it's the last message (shouldAnimate), start empty to allow animation.
   // Otherwise show full content immediately (history/old messages).
@@ -218,7 +217,7 @@ function Steps({ steps }: { steps: Array<{ type: string; data: Record<string, un
   if (steps.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-gray-100 overflow-hidden mb-4 bg-gray-50/30">
+    <div className="rounded-lg border border-gray-100 overflow-hidden mb-2 bg-gray-50/30">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100/50 transition-colors"
@@ -454,7 +453,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                 if (m.role === "user") {
                   const content = getTextContent(m);
                   return (
-                    <div key={m.id} className="group flex w-full items-start justify-end gap-3 py-6">
+                    <div key={m.id} className="group flex w-full items-start justify-end gap-3 py-4">
                       <div className="relative flex flex-col gap-2 rounded-2xl px-4 py-2.5 text-[13px] bg-blue-600 text-white max-w-[85%] shadow-sm">
                         <div className="whitespace-pre-wrap leading-6">{content}</div>
                       </div>
@@ -469,7 +468,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                   const pendingTool = getPendingTool(m);
 
                   return (
-                    <div key={m.id} className="group flex w-full items-start justify-start gap-3 py-6">
+                    <div key={m.id} className="group flex w-full items-start justify-start gap-2 py-5">
                       <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-gray-200">
                         <SparklesIcon size={14} />
                       </div>
