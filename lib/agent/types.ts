@@ -33,6 +33,14 @@ export interface AgentState {
     toolResults: Map<string, unknown>;
     reflections: string[];
     isComplete: boolean;
+    /** Track execution history for replanning */
+    executionHistory: Array<{
+        step: PlanStep;
+        result: unknown;
+        error?: string;
+    }>;
+    /** Current iteration count to prevent infinite loops */
+    attemptCount: number;
 }
 
 export type AgentEventType =
@@ -79,4 +87,12 @@ export interface PlannerContext {
         responseTone: string;
         customInstructions?: string;
     };
+    /** Error message from last tool execution, used for retry */
+    lastError?: string;
+    /** History of previous attempts to help planner fix errors */
+    executionHistory?: Array<{
+        step: PlanStep;
+        result: unknown;
+        error?: string;
+    }>;
 }

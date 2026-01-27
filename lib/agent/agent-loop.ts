@@ -55,6 +55,8 @@ export async function initAgentState(
         toolResults: new Map(),
         reflections: [],
         isComplete: false,
+        executionHistory: [],
+        attemptCount: 0,
     };
 }
 
@@ -62,7 +64,8 @@ export async function initAgentState(
  * Build context for planner
  */
 async function buildPlannerContext(
-    state: AgentState
+    state: AgentState,
+    lastError?: string
 ): Promise<PlannerContext> {
     // Retrieve docs
     const docsCandidates = await retrieveDocs(state.query, 12);
@@ -108,6 +111,8 @@ async function buildPlannerContext(
             responseTone: prefs?.responseTone || "friendly",
             customInstructions: prefs?.customInstructions || undefined,
         },
+        lastError,
+        executionHistory: state.executionHistory,
     };
 }
 
@@ -229,15 +234,33 @@ export async function* runAgentLoop(
                 state.toolResults
             );
 
+            // Record in execution history
+            state.executionHistory.push({
+                step,
+                result: event.type === "tool_result" ? event.toolOutput : null,
+                error: (event.type === "error" ? event.error : undefined) ||
+                    (replanResult.replan ? replanResult.errorMessage : undefined),
+            });
+
             if (replanResult.replan) {
-                const newContext = await buildPlannerContext(state);
+                state.attemptCount++;
+                if (state.attemptCount >= MAX_ITERATIONS) {
+                    yield {
+                        type: "error",
+                        error: "Max retry limit reached. Stopping agent loop.",
+                    };
+                    return;
+                }
+
+                // Pass error message to planner so it can fix the issue
+                const newContext = await buildPlannerContext(state, replanResult.errorMessage);
                 const newPlan = await generatePlan(newContext);
                 state.plan = newPlan;
                 state.currentStepIndex = 0;
 
                 yield {
                     type: "plan_created",
-                    content: `Replanned: ${replanResult.reason}`,
+                    content: `Replanned (Attempt ${state.attemptCount}): ${replanResult.reason}`,
                 };
             } else {
                 state.currentStepIndex++;

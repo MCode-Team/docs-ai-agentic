@@ -15,7 +15,7 @@ Use this for:
 - String manipulation
 - Algorithm implementation
 
-Available packages: numpy, pandas, math, json, re, datetime, collections, itertools, functools.
+Available packages: numpy, pandas, math, json, re, datetime, collections, itertools, functools, heapq, statistics, random.
 
 Important:
 - Set a 'result' variable to return a value

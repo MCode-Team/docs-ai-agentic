@@ -118,3 +118,16 @@ CREATE TABLE IF NOT EXISTS memory_facts (
 CREATE INDEX IF NOT EXISTS idx_facts_user ON memory_facts(user_id);
 CREATE INDEX IF NOT EXISTS idx_facts_embedding ON memory_facts
 USING ivfflat (embedding vector_cosine_ops) WITH (lists = 50);
+
+-- Tool approvals for pending tool calls
+CREATE TABLE IF NOT EXISTS tool_approvals (
+  id TEXT PRIMARY KEY,
+  tool_name TEXT NOT NULL,
+  input JSONB,
+  status TEXT DEFAULT 'pending',  -- 'pending' | 'approved' | 'rejected' | 'executed'
+  created_at BIGINT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tool_approvals_status ON tool_approvals(status);
+

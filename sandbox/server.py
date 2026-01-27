@@ -270,6 +270,39 @@ class SandboxHandler(BaseHTTPRequestHandler):
             import collections
             import itertools
             import functools
+            import heapq
+            import statistics
+            import random
+            
+            # Allowed modules map for custom import
+            allowed_modules = {
+                "numpy": np,
+                "np": np,
+                "pandas": pd,
+                "pd": pd,
+                "math": math,
+                "json": json_module,
+                "re": re,
+                "datetime": datetime,
+                "collections": collections,
+                "itertools": itertools,
+                "functools": functools,
+                "heapq": heapq,
+                "statistics": statistics,
+                "random": random,
+            }
+            
+            # Custom import function to handle 'from X import Y'
+            original_import = __builtins__.__import__ if hasattr(__builtins__, '__import__') else __import__
+            
+            def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
+                if name in allowed_modules:
+                    return allowed_modules[name]
+                # Allow submodule imports for allowed modules
+                base_module = name.split('.')[0]
+                if base_module in allowed_modules:
+                    return original_import(name, globals, locals, fromlist, level)
+                raise ImportError(f"Import of '{name}' is not allowed in sandbox")
             
             safe_globals.update({
                 "np": np,
@@ -283,7 +316,16 @@ class SandboxHandler(BaseHTTPRequestHandler):
                 "collections": collections,
                 "itertools": itertools,
                 "functools": functools,
+                "heapq": heapq,
+                "statistics": statistics,
+                "random": random,
                 "WORKSPACE": WORKSPACE,
+                # Add individual frequently-used functions directly
+                "heappush": heapq.heappush,
+                "heappop": heapq.heappop,
+                "heapify": heapq.heapify,
+                # Custom import
+                "__import__": safe_import,
             })
             
             local_vars: dict[str, Any] = {}
