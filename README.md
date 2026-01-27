@@ -1,23 +1,23 @@
 # AI Agentic Docs (RAG + SQL Dictionary)
 
-An advanced AI-powered documentation and database assistant built with Next.js, Vercel AI SDK, and PostgreSQL (pgvector). This project demonstrates a **hybrid agentic architecture** capable of answering complex queries by retrieving information from both written documentation and database schemas.
+ผู้ช่วยอัจฉริยะเพื่อการจัดการเอกสารและฐานข้อมูล (AI-powered documentation and database assistant) ที่พัฒนาด้วย Next.js, Vercel AI SDK และ PostgreSQL (pgvector) โปรเจคนี้แสดงให้เห็นถึง **สถาปัตยกรรม Agentic แบบลูกผสม (Hybrid Agentic Architecture)** ที่สามารถตอบคำถามซับซ้อนโดยการดึงข้อมูลจากทั้งเอกสารและโครงสร้างฐานข้อมูล (Database Schema)
 
 ![System Architecture](./system-architecture.jpg)
 
-## 🌟 Key Features
+## 🌟 ฟีเจอร์หลัก (Key Features)
 
-### 1. Dual-Mode AI Core
-- **Agentic Mode (Advanced)**: A fully autonomous loop (`lib/agent`) that plans, executes tools, reflects, and re-plans. Supports **Human-in-the-loop** for tool approvals.
-- **Simple Mode (Speed)**: A lightweight RAG pipeline for fast, factual answers.
+### 1. Dual-Mode AI Core (ระบบ AI สองโหมด)
+- **Agentic Mode (ขั้นสูง)**: ลูปการทำงานอัตโนมัติ (`lib/agent`) ที่สามารถวางแผน (Plan), เรียกใช้เครื่องมือ (Execute Tools), ตรวจสอบผลลัพธ์ (Reflect), และวางแผนใหม่ (Re-plan) ได้เอง รองรับ **Human-in-the-loop** สำหรับการรออนุมัติจากผู้ใช้
+- **Simple Mode (เน้นความเร็ว)**: ระบบ RAG แบบพื้นฐานสำหรับคำตอบที่ต้องการความรวดเร็วและเน้นข้อเท็จจริง
 
-### 2. Advanced Retrieval (RAG)
-- **Documentation**: Ingests `.mdx` files into vector chunks.
-- **Data Dictionary**: Introspects the SQL database schema to create a semantic dictionary of tables and columns, allowing the AI to understand and query your data structure.
+### 2. Advanced Retrieval (ระบบค้นหาข้อมูลขั้นสูง / RAG)
+- **Documentation**: นำเข้าไฟล์ `.mdx` แปลงเป็น vector chunks
+- **Data Dictionary**: อ่านโครงสร้างฐานข้อมูล SQL (Schema Introspection) เพื่อสร้าง "พจนานุกรมข้อมูล" อธิบายความหมายของตารางและคอลัมน์ ช่วยให้ AI เข้าใจและ query โครงสร้างข้อมูลของคุณได้แม่นยำ
 
 ### 3. Modern Interactive UI (`Ask AI`)
-- **Streaming Responses**: Real-time token streaming with the Vercel AI SDK.
-- **Process Visualization**: See the agent's "Thinking" process, active steps, and tool executions.
-- **Rich Citations**: Direct links to source documents and database schema references.
+- **Streaming Responses**: แสดงผลลัพธ์แบบ Streaming Real-time ด้วย Vercel AI SDK
+- **Process Visualization**: แสดงกระบวนการ "คิด" (Thinking), ขั้นตอนการทำงาน, และการเรียกใช้ Tools ของ Agent ให้ผู้ใช้เห็นภาพ
+- **Rich Citations**: มีลิงก์อ้างอิงกลับไปยังเอกสารต้นทางและ Data Dictionary ที่ถูกใช้งานในการตอบคำถาม
 
 ## 🛠️ Tech Stack
 - **Framework**: Next.js 15+ (App Router)
@@ -25,20 +25,20 @@ An advanced AI-powered documentation and database assistant built with Next.js, 
 - **Database**: PostgreSQL + `pgvector` extension
 - **Styling**: Tailwind CSS, Lucide React
 
-## 🚀 Getting Started
+## 🚀 การเริ่มต้นใช้งาน (Getting Started)
 
-### Prerequisites
-- Node.js 18+ (Recommended: 20)
-- PostgreSQL 15+ with `pgvector` extension installed.
+### Prerequisites (สิ่งที่ต้องมี)
+- Node.js 18+ (แนะนำรุ่น 20)
+- PostgreSQL 15+ ที่ติดตั้ง `pgvector` extension แล้ว
 
 ### 1. Setup Database
-Create a database named `docs_ai` and run the schema script:
+สร้างฐานข้อมูลชื่อ `docs_ai` และรันสคริปต์ schema:
 ```bash
 psql "$DATABASE_URL" -f sql/schema.sql
 ```
 
 ### 2. Environment Variables
-Copy `.env.example` to `.env.local` and configure your keys (OpenAI, Database URL):
+คัดลอกไฟล์ `.env.example` เป็น `.env.local` และตั้งค่าคีย์ต่างๆ (OpenAI, Database URL):
 ```bash
 cp .env.example .env.local
 ```
@@ -48,15 +48,15 @@ cp .env.example .env.local
 npm install
 ```
 
-### 4. Ingest Data
-Run the ingestion scripts to populate your vector database:
+### 4. Ingest Data (นำเข้าข้อมูล)
+รันสคริปต์เพื่อนำข้อมูลเข้าสู่ Vector Database:
 
-**Ingest Documentation (MDX -> Vector):**
+**นำเข้าเอกสาร (MDX -> Vector):**
 ```bash
 npm run ingest:docs
 ```
 
-**Ingest Data Dictionary (Schema -> Vector):**
+**นำเข้า Data Dictionary (Schema -> Vector):**
 ```bash
 npm run ingest:dict
 ```
@@ -65,49 +65,48 @@ npm run ingest:dict
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000/docs/getting-started](http://localhost:3000/docs/getting-started).
+เปิด [http://localhost:3000/docs/getting-started](http://localhost:3000/docs/getting-started)
 
 ## 🐳 Containerized Setup (Docker)
 
-For a complete local environment including the Reranker and Code Sandbox, use Docker Compose.
+สำหรับการรันระบบเต็มรูปแบบ (Full Stack) รวมถึง Reranker และ Code Sandbox ให้ใช้ Docker Compose
 
 ```bash
 docker-compose up -d --build
 ```
 
-### Services Included:
-### Services Included:
+### Services Included (บริการที่รวมอยู่ใน Docker):
 
 1.  **Web App** (Port `3000`)
-    *   **Role**: The main application interface and API backend.
-    *   **Relevance**: Hosts the "Ask AI" chat UI, manages the Agentic Loop, handles RAG logic, and connects all other services together. Built with Next.js 15.
+    *   **Role**: ส่วนติดต่อผู้ใช้หลักและ API Backend
+    *   **Relevance**: ให้บริการหน้าจอ "Ask AI Chat", จัดการระบบ Agentic Loop, ดูแล logic ของ RAG และเชื่อมต่อบริการอื่นๆ เข้าด้วยกัน พัฒนาด้วย Next.js 15
 
 2.  **Database** (Port `5432`)
-    *   **Role**: PostgreSQL database with `pgvector` extension.
-    *   **Relevance**: Acts as the system's long-term memory. It stores:
-        *   Vector embeddings for documentation and schema definitions (enabling semantic search).
-        *   Application data and conversation history.
+    *   **Role**: ฐานข้อมูล PostgreSQL พร้อม `pgvector` extension
+    *   **Relevance**: ทำหน้าที่เป็น "ความจำระยะยาว" (Long-term memory) ของระบบ จัดเก็บ:
+        *   Vector embeddings ของเอกสารและ Schema (สำหรับการค้นหาเชิงความหมาย)
+        *   ข้อมูลของแอปพลิเคชันและประวัติการสนทนา
 
 3.  **Zerank** (Port `8787`)
-    *   **Role**: A self-hosted Reranking API using the `zeroentropy/zerank-2` model.
-    *   **Relevance**: Drastically improves answer quality. After the database retrieves rough search results, Zerank re-scores them to ensure the AI only sees the *most* relevant context, reducing hallucinations.
+    *   **Role**: API สำหรับการจัดอันดับข้อมูล (Reranking) แบบ self-hosted โดยใช้โมเดล `zeroentropy/zerank-2`
+    *   **Relevance**: ช่วยปรับปรุงคุณภาพคำตอบอย่างมาก! หลังจากฐานข้อมูลค้นหาข้อมูลดิบมาแล้ว Zerank จะให้คะแนนความเกี่ยวข้องใหม่ เพื่อให้แน่ใจว่า AI จะได้รับข้อมูลบริบทที่ *ตรงจุด* เท่านั้น ช่วยลดอาการหลอน (Hallucinations) ของ AI
 
 4.  **Sandbox** (Port `8000`)
-    *   **Role**: A secure, isolated Python & Bash execution environment.
-    *   **Relevance**: Gives the Agent "Hands". It allows the AI to safely:
-        *   Execute Python code for complex calculations or data analysis.
-        *   Run bash scripts to interact with the file system or environment.
-        *   Verify code snippets before showing them to the user.
+    *   **Role**: สภาพแวดล้อมที่ปลอดภัยและแยกส่วน (Isolated) สำหรับรัน Python และ Bash
+    *   **Relevance**: เปรียบเสมือน "มือ" ของ Agent ช่วยให้ AI สามารถ:
+        *   รันโค้ด Python เพื่อคำนวณซับซ้อนหรือวิเคราะห์ข้อมูล
+        *   รันคำสั่ง Bash เพื่อจัดการไฟล์หรือระบบ
+        *   ตรวจสอบความถูกต้องของโค้ดก่อนแสดงให้ผู้ใช้เห็น
 
 > [!NOTE]
-> Ensure you have `HUGGING_FACE_HUB_TOKEN` set in your `.env.local` if using gated models for Zerank.
+> ตรวจสอบให้แน่ใจว่าคุณได้ตั้งค่า `HUGGING_FACE_HUB_TOKEN` ในไฟล์ `.env.local` หากคุณใช้โมเดลของ Zerank ที่ต้องมีการยืนยันตัวตน (Gated models)
 
 ## 📚 Documentation
-- [System Features](content/docs/system-features.mdx) - Detailed breakdown of Agentic AI, RAG, and UI features.
-- [System Architecture](content/docs/system-architecture.mdx) - Diagrams and architectural deep dive.
+- [System Features](content/docs/system-features.mdx) - รายละเอียดฟีเจอร์ของระบบ Agentic AI, RAG, และ UI
+- [System Architecture](content/docs/system-architecture.mdx) - แผนภาพและรายละเอียดเชิงลึกของสถาปัตยกรรม (System Architecture Diagram)
 
 ## 📂 Project Structure
-- `lib/agent`: Core agent logic (Planner, Loop, Tools).
-- `scripts`: Ingestion scripts for docs and DB dictionary.
-- `components/ask-ai-chat.tsx`: Main chat interface.
-- `content/docs`: MDX documentation source.
+- `lib/agent`: Logic หลักของ Agent (Planner, Loop, Tools)
+- `scripts`: สคริปต์สำหรับนำเข้าข้อมูล (Ingestion) สำหรับ Docs และ DB Dictionary
+- `components/ask-ai-chat.tsx`: หน้าจอแชทหลัก
+- `content/docs`: ต้นฉบับเอกสาร MDX
