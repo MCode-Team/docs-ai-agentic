@@ -67,6 +67,41 @@ npm run dev
 ```
 Open [http://localhost:3000/docs/getting-started](http://localhost:3000/docs/getting-started).
 
+## 🐳 Containerized Setup (Docker)
+
+For a complete local environment including the Reranker and Code Sandbox, use Docker Compose.
+
+```bash
+docker-compose up -d --build
+```
+
+### Services Included:
+### Services Included:
+
+1.  **Web App** (Port `3000`)
+    *   **Role**: The main application interface and API backend.
+    *   **Relevance**: Hosts the "Ask AI" chat UI, manages the Agentic Loop, handles RAG logic, and connects all other services together. Built with Next.js 15.
+
+2.  **Database** (Port `5432`)
+    *   **Role**: PostgreSQL database with `pgvector` extension.
+    *   **Relevance**: Acts as the system's long-term memory. It stores:
+        *   Vector embeddings for documentation and schema definitions (enabling semantic search).
+        *   Application data and conversation history.
+
+3.  **Zerank** (Port `8787`)
+    *   **Role**: A self-hosted Reranking API using the `zeroentropy/zerank-2` model.
+    *   **Relevance**: Drastically improves answer quality. After the database retrieves rough search results, Zerank re-scores them to ensure the AI only sees the *most* relevant context, reducing hallucinations.
+
+4.  **Sandbox** (Port `8000`)
+    *   **Role**: A secure, isolated Python & Bash execution environment.
+    *   **Relevance**: Gives the Agent "Hands". It allows the AI to safely:
+        *   Execute Python code for complex calculations or data analysis.
+        *   Run bash scripts to interact with the file system or environment.
+        *   Verify code snippets before showing them to the user.
+
+> [!NOTE]
+> Ensure you have `HUGGING_FACE_HUB_TOKEN` set in your `.env.local` if using gated models for Zerank.
+
 ## 📚 Documentation
 - [System Features](content/docs/system-features.mdx) - Detailed breakdown of Agentic AI, RAG, and UI features.
 - [System Architecture](content/docs/system-architecture.mdx) - Diagrams and architectural deep dive.
