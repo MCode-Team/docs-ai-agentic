@@ -2,7 +2,7 @@
 
 import { useChat, type UIMessage } from "@ai-sdk/react";
 import { isTextUIPart, isDataUIPart, DefaultChatTransport } from "ai";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { ChevronDown, ChevronRight, PlayCircle, CheckCircle2, BrainCircuit, Sparkles, Send, Trash2, Share2, Copy, X, CornerDownLeft, ArrowDown, Square } from "lucide-react";
 import { useStickToBottom } from "use-stick-to-bottom";
 
@@ -101,6 +101,54 @@ function getTextContent(message: UIMessage): string {
     }
   }
   return text;
+}
+
+function StreamingText({ content, className }: { content: string; className?: string }) {
+  const [displayedContent, setDisplayedContent] = useState(content);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const targetContent = useRef(content);
+  const currentContent = useRef(content);
+
+  useEffect(() => {
+    targetContent.current = content;
+    if (content.length > currentContent.current.length) {
+      setIsStreaming(true);
+    } else if (content.length < currentContent.current.length) {
+      // Content reset/cleared
+      currentContent.current = content;
+      setDisplayedContent(content);
+      setIsStreaming(false);
+    }
+  }, [content]);
+
+  useEffect(() => {
+    if (!isStreaming) return;
+
+    let animationFrameId: number;
+    const animate = () => {
+      if (currentContent.current.length < targetContent.current.length) {
+        // Calculate chunk size based on backlog to catch up
+        const diff = targetContent.current.length - currentContent.current.length;
+        const chunk = Math.max(1, Math.ceil(diff / 8));
+
+        const nextSlice = targetContent.current.slice(0, currentContent.current.length + chunk);
+        currentContent.current = nextSlice;
+        setDisplayedContent(nextSlice);
+
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        setIsStreaming(false);
+      }
+    };
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [isStreaming]);
+
+  return (
+    <div className={className}>
+      {displayedContent}
+    </div>
+  );
 }
 
 function SparklesIcon({ size = 16, className }: { size?: number; className?: string }) {
@@ -475,9 +523,10 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                         )}
 
                         {content && (
-                          <div className="whitespace-pre-wrap leading-7 text-gray-800 text-[14px]">
-                            {content}
-                          </div>
+                          <StreamingText
+                            content={content}
+                            className="whitespace-pre-wrap leading-7 text-gray-800 text-[14px]"
+                          />
                         )}
 
                         {sources && (sources.docs.length > 0 || sources.dictionary.length > 0) && (
