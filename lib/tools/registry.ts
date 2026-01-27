@@ -1,23 +1,32 @@
-import { getSalesSummaryTool } from "@/lib/tools/fixed/get-sales-summary";
-import { getOrderStatusCountsTool } from "@/lib/tools/fixed/get-order-status-counts";
-import { analyzeDataTool } from "@/lib/tools/analyze/analyze-data";
-import { exportExcelDynamicTool } from "@/lib/tools/export/export-excel-dynamic";
-import { getOrdersTool } from "@/lib/tools/fixed/get-orders";
-import { executeCodeTool } from "@/lib/tools/sandbox/execute-code";
-import { bashTool, readFileTool, writeFileTool } from "@/lib/tools/sandbox/bash-tools";
+/**
+ * Tools Registry - Central registry for all AI tools
+ * 
+ * Categories:
+ * - Data: Query and fetch data from database
+ * - Analyze: Data analysis and processing
+ * - Export: Export data to files
+ * - Sandbox: Code execution (Python/Bash) and file operations
+ */
 
+import { dataTools } from "./fixed";
+import { analyzeTools } from "./analyze";
+import { exportTools } from "./export";
+import { sandboxTools } from "./sandbox";
+
+// Main registry - all tools available to the agent
 export const toolRegistry = {
-  getSalesSummary: getSalesSummaryTool,
-  getOrderStatusCounts: getOrderStatusCountsTool,
-  analyzeData: analyzeDataTool,
-  exportExcelDynamic: exportExcelDynamicTool,
-  getOrders: getOrdersTool,
-  // Sandbox tools
-  executeCode: executeCodeTool,
-  bash: bashTool,
-  readFile: readFileTool,
-  writeFile: writeFileTool,
+  // Data tools
+  ...dataTools,
+  // Analysis tools
+  ...analyzeTools,
+  // Export tools
+  ...exportTools,
+  // Sandbox tools (Python, Bash, File I/O)
+  ...sandboxTools,
 } as const;
 
+// Type for tool names
 export type ToolName = keyof typeof toolRegistry;
 
+// Grouped exports for selective use
+export { dataTools, analyzeTools, exportTools, sandboxTools };
