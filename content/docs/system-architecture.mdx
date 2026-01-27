@@ -17,8 +17,8 @@ graph TD
         
         subgraph Mode_Selection ["Mode Selection"]
             CheckMode{Agentic Mode?}
-            SimpleMode[Simple Mode (RAG)]
-            AgentMode[Agentic Mode (Loop)]
+            SimpleMode["Simple Mode (RAG)"]
+            AgentMode["Agentic Mode (Loop)"]
             
             API --> CheckMode
             CheckMode -->|No| SimpleMode
@@ -63,7 +63,7 @@ graph TD
     subgraph Ingestion ["Ingestion Scripts"]
         Script_Docs[ingest-docs.ts]
         Script_Dict[ingest-db-dictionary.ts]
-        Files_MDX[Content / Docs (.mdx)]
+        Files_MDX["Content / Docs (.mdx)"]
         
         Files_MDX --> Script_Docs
         Script_Docs --> VectorDocs
