@@ -6,6 +6,8 @@
 
 ![System Architecture](./system-architecture.jpg)
 
+<video controls src="./AI_Agentic_Docs.mp4" width="100%"></video>
+
 ## 🌟 ฟีเจอร์หลัก (Key Features)
 
 ### 1. Dual-Mode AI Core (ระบบ AI สองโหมด)
