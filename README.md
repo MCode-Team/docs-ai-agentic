@@ -38,6 +38,13 @@
 
 ### 1. Setup Database
 สร้างฐานข้อมูลชื่อ `docs_ai` และรันสคริปต์ schema:
+
+เราสามารถใช้งานคำสั่ง `db:init` เพื่อสร้าง table พื้นฐานได้ทันที:
+```bash
+npm run db:init
+```
+
+หรือรันผ่าน `psql` โดยตรง:
 ```bash
 psql "$DATABASE_URL" -f sql/schema.sql
 ```

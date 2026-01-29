@@ -38,6 +38,13 @@ An advanced AI-powered documentation and database assistant built with Next.js, 
 
 ### 1. Setup Database
 Create a database named `docs_ai` and run the schema script:
+
+You can use the `db:init` command to initialize the database tables:
+```bash
+npm run db:init
+```
+
+Or run via `psql` directly:
 ```bash
 psql "$DATABASE_URL" -f sql/schema.sql
 ```
