@@ -92,8 +92,8 @@ async function handleAgenticMode(
         // 2. Fetch sources (Blocking operation moved inside stream)
         const sources = await buildSources(question);
 
-        // 3. Initialize agent state with pre-fetched sources
-        const state = await initAgentState(userId, conversationId, question, sources);
+        // 3. Initialize agent state with pre-fetched sources and history
+        const state = await initAgentState(userId, conversationId, question, sources, messages);
         agentStates.set(state.conversationId, state);
 
         // 4. Run agent loop
@@ -246,7 +246,7 @@ async function handleSimpleMode(
   }));
 
   const result = streamText({
-    model: openai("gpt-5-nano"),
+    model: openai("gpt-5-mini"),
     system: `
 คุณคือ Ask AI สำหรับ Docs + PostgreSQL
 ตอบคำถามตามข้อมูลที่ให้มา

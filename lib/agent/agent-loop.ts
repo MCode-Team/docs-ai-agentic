@@ -34,7 +34,8 @@ export async function initAgentState(
     userId: string,
     conversationId: string | null,
     query: string,
-    sources?: AgentState["sources"]
+    sources?: AgentState["sources"],
+    history?: { role: string; content: string }[]
 ): Promise<AgentState> {
     // Get or create conversation
     let convId = conversationId;
@@ -44,7 +45,27 @@ export async function initAgentState(
     }
 
     // Load previous messages
-    const messages = await getMessages(convId, 20);
+    // If history is provided from client, use it to construct state
+    // continuously. Otherwise fallback to DB.
+    let messages: Message[] = [];
+
+    if (history && history.length > 0) {
+        // Exclude the last message as it is likely the current user query
+        // which will be handled separately by the agent loop and added to DB
+        const previousMessages = history.slice(0, -1);
+        messages = previousMessages.map((h, i) => ({
+            id: -1 - i, // Temporary IDs for ephemeral history
+            conversationId: convId!,
+            role: h.role as Message["role"],
+            content: h.content,
+            toolName: null,
+            toolInput: null,
+            toolOutput: null,
+            createdAt: new Date(),
+        }));
+    } else {
+        messages = await getMessages(convId, 20);
+    }
 
     return {
         conversationId: convId,
