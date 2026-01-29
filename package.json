@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "ingest:docs": "bun scripts/ingest-docs.ts",
-    "ingest:dict": "bun scripts/ingest-db-dictionary.ts"
+    "ingest:dict": "bun scripts/ingest-db-dictionary.ts",
+    "db:init": "bun scripts/init-db.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.19",
