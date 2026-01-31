@@ -10,7 +10,9 @@
     "lint:fix": "eslint --fix .",
     "ingest:docs": "bun scripts/ingest-docs.ts",
     "ingest:dict": "bun scripts/ingest-db-dictionary.ts",
-    "db:init": "bun scripts/init-db.ts"
+    "db:init": "bun scripts/init-db.ts",
+    "seed:analytics": "bun scripts/seed-analytics.ts",
+    "seed:analytics:reset": "bun scripts/seed-analytics.ts --reset"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.19",
