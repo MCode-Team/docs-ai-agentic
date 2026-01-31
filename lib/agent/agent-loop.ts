@@ -27,6 +27,7 @@ import { retrieveDictionary } from "@/lib/retrieval-dictionary";
 import { rerankZeroRank2 } from "@/lib/rerank-zerank2";
 
 const MAX_ITERATIONS = 10;
+const MAX_TOOL_CALLS_PER_TURN = 6;
 
 /**
  * Initialize agent state
@@ -220,8 +221,19 @@ async function executeToolStep(
 
     // Auto-approved: execute immediately
     try {
+        const startedAt = Date.now();
         const result = await (tool as any).execute(step.input);
-        state.toolResults.set(`${toolName}_${state.currentStepIndex}`, result);
+        const tookMs = Date.now() - startedAt;
+
+        const wrapped = {
+            ...(typeof result === "object" && result ? result : { result }),
+            _meta: {
+                tookMs,
+                toolName,
+            },
+        };
+
+        state.toolResults.set(`${toolName}_${state.currentStepIndex}`, wrapped);
 
         // Audit trail (tool execution)
         await addMessage(state.conversationId, {
@@ -229,14 +241,14 @@ async function executeToolStep(
             content: `EXECUTED tool call: ${toolName}`,
             toolName,
             toolInput: step.input,
-            toolOutput: result,
+            toolOutput: wrapped,
         });
 
         return {
             type: "tool_result",
             toolName,
             toolInput: step.input,
-            toolOutput: result,
+            toolOutput: wrapped,
         };
     } catch (error) {
         await addMessage(state.conversationId, {
@@ -361,6 +373,16 @@ export async function* runAgentLoop(
                 content: `Handoff to ${expertProfile.id}: ${step.reason}`,
             };
         } else if (step.type === "tool") {
+            // Budget guard: avoid runaway tool loops
+            const toolCallsSoFar = state.executionHistory.filter((h) => h.step.type === "tool").length;
+            if (toolCallsSoFar >= MAX_TOOL_CALLS_PER_TURN) {
+                yield {
+                    type: "error",
+                    error: `Tool budget exceeded (${MAX_TOOL_CALLS_PER_TURN}). Please narrow the request or run a smaller report.`,
+                };
+                return;
+            }
+
             const event = await executeToolStep(state, step);
             yield event;
 
