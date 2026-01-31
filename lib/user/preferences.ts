@@ -48,7 +48,9 @@ export async function updateUserPreferences(
 const SAFE_TOOLS = [
     'getSalesSummary',
     'getOrderStatusCounts',
-    'analyzeData'
+    'analyzeData',
+    // Analytics aggregate tool is designed to return summarized results only
+    'queryAggregate'
 ];
 
 export async function shouldAutoApproveTool(

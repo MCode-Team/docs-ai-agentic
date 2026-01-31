@@ -24,6 +24,25 @@ const MetricSchema = z.enum([
   "gross_profit",
 ]);
 
+const OrderByFieldSchema = z.enum([
+  // group fields / aliases
+  "date_day",
+  "date_week",
+  "date_month",
+  "branch_id",
+  "sku",
+  "category_id",
+  "brand_name",
+  "channel",
+  // metrics
+  "order_count",
+  "customer_count",
+  "qty",
+  "net_sales",
+  "cost",
+  "gross_profit",
+]);
+
 function tzExpr(tsCol: string) {
   // Convert timestamptz to local time, then trunc
   return `(${tsCol} AT TIME ZONE 'Asia/Bangkok')`;
@@ -104,7 +123,7 @@ export const queryAggregateTool = tool({
     limit: z.number().int().min(1).max(5000).default(500),
     orderBy: z
       .object({
-        field: z.string().default("net_sales"),
+        field: OrderByFieldSchema.default("net_sales"),
         direction: z.enum(["asc", "desc"]).default("desc"),
       })
       .optional(),

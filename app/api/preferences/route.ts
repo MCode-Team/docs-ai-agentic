@@ -27,8 +27,12 @@ export async function POST(req: Request) {
   const body = await req.json();
   const { autoApproveTools = [] } = body as { autoApproveTools?: string[] };
 
+  // Validate tool names
+  const allowed = new Set(Object.keys(toolRegistry));
+  const cleaned = (autoApproveTools || []).filter((t) => allowed.has(t));
+
   const updated = await updateUserPreferences(user.id, {
-    autoApproveTools,
+    autoApproveTools: cleaned,
   });
 
   return NextResponse.json({ ok: true, preferences: updated });
