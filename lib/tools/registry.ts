@@ -12,11 +12,14 @@ import { dataTools } from "./fixed";
 import { analyzeTools } from "./analyze";
 import { exportTools } from "./export";
 import { sandboxTools } from "./sandbox";
+import { analyticsTools } from "./analytics";
 
 // Main registry - all tools available to the agent
 export const toolRegistry = {
   // Data tools
   ...dataTools,
+  // Analytics tools
+  ...analyticsTools,
   // Analysis tools
   ...analyzeTools,
   // Export tools
@@ -29,4 +32,4 @@ export const toolRegistry = {
 export type ToolName = keyof typeof toolRegistry;
 
 // Grouped exports for selective use
-export { dataTools, analyzeTools, exportTools, sandboxTools };
+export { dataTools, analyticsTools, analyzeTools, exportTools, sandboxTools };
