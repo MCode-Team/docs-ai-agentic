@@ -55,11 +55,6 @@ export async function shouldAutoApproveTool(
     userId: string,
     toolName: string
 ): Promise<boolean> {
-    // Always auto-approve everything as requested
-    return true;
-
-    // Original logic disabled:
-    /*
     // Always approve safe tools
     if (SAFE_TOOLS.includes(toolName)) {
         return true;
@@ -68,5 +63,4 @@ export async function shouldAutoApproveTool(
     const prefs = await getUserPreferences(userId);
     if (!prefs) return false;
     return prefs.autoApproveTools.includes(toolName);
-    */
 }

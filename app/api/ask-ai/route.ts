@@ -40,14 +40,14 @@ export async function POST(req: Request) {
   userCode = user.userCode;
 
   const body = await req.json();
-  const { messages, conversationId, agentic = true } = body;
+  const { messages, conversationId, agentic = true, expertId = null } = body;
 
   const lastUser = [...messages].reverse().find((m: { role: string }) => m.role === "user");
   const question = lastUser?.content ?? "";
 
   // Set cookie for new users
   const response = agentic
-    ? await handleAgenticMode(user.id, conversationId, question, messages)
+    ? await handleAgenticMode(user.id, conversationId, question, messages, expertId)
     : await handleSimpleMode(question, messages);
 
   // Set cookie if new user
@@ -69,7 +69,8 @@ async function handleAgenticMode(
   userId: string,
   conversationId: string | null,
   question: string,
-  messages: { role: string; content: string }[]
+  messages: { role: string; content: string }[],
+  expertId: "docs" | "sql" | "ops" | "security" | null
 ) {
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
@@ -93,7 +94,7 @@ async function handleAgenticMode(
         const sources = await buildSources(question);
 
         // 3. Initialize agent state with pre-fetched sources and history
-        const state = await initAgentState(userId, conversationId, question, sources, messages);
+        const state = await initAgentState(userId, conversationId, question, sources, messages, expertId);
         agentStates.set(state.conversationId, state);
 
         // 4. Run agent loop

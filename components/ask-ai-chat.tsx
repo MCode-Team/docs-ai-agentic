@@ -272,6 +272,26 @@ function Steps({ steps }: { steps: Array<{ type: string; data: Record<string, un
                 </div>
               );
             }
+            if (step.type === "data-expert") {
+              let label = "Expert";
+              let rationale = "";
+              try {
+                const parsed = JSON.parse((step.data as any).expert);
+                label = `${parsed.label || parsed.expertId}`;
+                rationale = parsed.rationale ? ` — ${parsed.rationale}` : "";
+              } catch {
+                label = String((step.data as any).expert);
+              }
+              return (
+                <div key={idx} className="text-[11px] text-gray-700 flex items-center gap-2.5 pl-1 justify-between group">
+                  <div className="flex items-center gap-2.5">
+                    <Sparkles className="w-3 h-3 text-purple-600 shrink-0" />
+                    <span className="font-mono bg-white px-1 rounded border border-gray-100">Expert: {label}{rationale}</span>
+                  </div>
+                  {duration && <span className="text-[10px] text-gray-400 font-mono shrink-0">{duration}</span>}
+                </div>
+              );
+            }
             if (step.type === "data-tool-result") {
               return (
                 <div key={idx} className="text-[11px] text-gray-600 flex items-start gap-2.5 pl-1 opacity-75">
@@ -290,10 +310,12 @@ function Steps({ steps }: { steps: Array<{ type: string; data: Record<string, un
 
 // Custom transport that extends DefaultChatTransport
 class AskAIChatTransport extends DefaultChatTransport<UIMessage> {
-  constructor() {
+  private expertId: string | null;
+
+  constructor(opts: { expertId: string | null }) {
     super({
       api: "/api/ask-ai",
-      body: { agentic: true },
+      body: { agentic: true, expertId: opts.expertId },
       prepareSendMessagesRequest: async ({ messages }) => {
         return {
           body: {
@@ -305,18 +327,22 @@ class AskAIChatTransport extends DefaultChatTransport<UIMessage> {
                 .join(""),
             })),
             agentic: true,
+            expertId: opts.expertId,
           },
         };
       },
     });
+
+    this.expertId = opts.expertId;
   }
 }
 
 export function AskAIChat({ onClose }: AskAIChatProps) {
   const [pendingApprovals, setPendingApprovals] = useState<Map<string, { status: "pending" | "approved" | "rejected" }>>(new Map());
   const [input, setInput] = useState("");
+  const [expertId, setExpertId] = useState<string>("auto");
 
-  const transport = useMemo(() => new AskAIChatTransport(), []);
+  const transport = useMemo(() => new AskAIChatTransport({ expertId: expertId === "auto" ? null : expertId }), [expertId]);
 
   const { messages, sendMessage, status, setMessages, stop } = useChat({
     id: "ask-ai-chat",
@@ -622,6 +648,22 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                 onSubmit={handleSubmit}
                 className="flex flex-col"
               >
+                <div className="flex items-center justify-between px-4 pt-3">
+                  <div className="text-[11px] text-gray-500">Expert</div>
+                  <select
+                    value={expertId}
+                    onChange={(e) => setExpertId(e.target.value)}
+                    className="text-[12px] border border-gray-200 rounded-md px-2 py-1 bg-white"
+                    disabled={isLoading}
+                    aria-label="Select expert"
+                  >
+                    <option value="auto">Auto (Router)</option>
+                    <option value="docs">Docs</option>
+                    <option value="sql">SQL</option>
+                    <option value="ops">Ops</option>
+                    <option value="security">Security</option>
+                  </select>
+                </div>
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -632,7 +674,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                     }
                   }}
                   placeholder="What would you like to know?"
-                  className="w-full bg-transparent p-4 pb-14 text-[13px] resize-none outline-none placeholder:text-gray-400 min-h-[120px]"
+                  className="w-full bg-transparent p-4 pb-14 pt-3 text-[13px] resize-none outline-none placeholder:text-gray-400 min-h-[120px]"
                   disabled={isLoading}
                 />
                 <div className="absolute bottom-3 left-4 text-[11px] text-gray-400">

@@ -36,7 +36,8 @@ export async function initAgentState(
     conversationId: string | null,
     query: string,
     sources?: AgentState["sources"],
-    history?: { role: string; content: string }[]
+    history?: { role: string; content: string }[],
+    expertOverride?: "docs" | "sql" | "ops" | "security" | null
 ): Promise<AgentState> {
     // Get or create conversation
     let convId = conversationId;
@@ -78,7 +79,14 @@ export async function initAgentState(
         toolResults: new Map(),
         reflections: [],
         isComplete: false,
-        expert: undefined,
+        expert: expertOverride
+            ? {
+                  id: expertOverride,
+                  label: expertOverride.toUpperCase(),
+                  rationale: "User selected",
+                  allowedTools: getExpertProfile(expertOverride as any)?.allowedTools ?? [],
+              }
+            : undefined,
         executionHistory: [],
         attemptCount: 0,
         sources,
@@ -187,11 +195,19 @@ async function executeToolStep(
     if (!autoApprove) {
         // Create pending tool call for approval
         const approvalId = crypto.randomUUID();
-        createPendingToolCall({
+        await createPendingToolCall({
             id: approvalId,
             toolName,
             input: step.input,
             createdAt: Date.now(),
+        });
+
+        // Audit trail (tool intent)
+        await addMessage(state.conversationId, {
+            role: "tool",
+            content: `PENDING tool call: ${toolName}`,
+            toolName,
+            toolInput: step.input,
         });
 
         return {
@@ -207,6 +223,15 @@ async function executeToolStep(
         const result = await (tool as any).execute(step.input);
         state.toolResults.set(`${toolName}_${state.currentStepIndex}`, result);
 
+        // Audit trail (tool execution)
+        await addMessage(state.conversationId, {
+            role: "tool",
+            content: `EXECUTED tool call: ${toolName}`,
+            toolName,
+            toolInput: step.input,
+            toolOutput: result,
+        });
+
         return {
             type: "tool_result",
             toolName,
@@ -214,6 +239,14 @@ async function executeToolStep(
             toolOutput: result,
         };
     } catch (error) {
+        await addMessage(state.conversationId, {
+            role: "tool",
+            content: `FAILED tool call: ${toolName}`,
+            toolName,
+            toolInput: step.input,
+            toolOutput: { error: String(error) },
+        });
+
         return {
             type: "error",
             error: `Tool execution failed: ${error}`,
@@ -235,29 +268,40 @@ export async function* runAgentLoop(
         content: state.query,
     });
 
-    // Select expert (LLM-router)
-    const ctxForRoute = await buildPlannerContext(state);
-    const route = await routeExpert({
-        query: state.query,
-        docsContext: ctxForRoute.docsContext,
-        dictContext: ctxForRoute.dictContext,
-    });
-    const expertProfile = getExpertProfile(route.expertId);
-    state.expert = {
-        id: expertProfile.id,
-        label: expertProfile.label,
-        rationale: route.rationale,
-        allowedTools: expertProfile.allowedTools,
-    };
-
-    yield {
-        type: "expert_selected",
-        content: JSON.stringify({
-            expertId: expertProfile.id,
+    // Select expert (LLM-router) unless user explicitly selected one
+    if (!state.expert) {
+        const ctxForRoute = await buildPlannerContext(state);
+        const route = await routeExpert({
+            query: state.query,
+            docsContext: ctxForRoute.docsContext,
+            dictContext: ctxForRoute.dictContext,
+        });
+        const expertProfile = getExpertProfile(route.expertId);
+        state.expert = {
+            id: expertProfile.id,
             label: expertProfile.label,
             rationale: route.rationale,
-        }),
-    };
+            allowedTools: expertProfile.allowedTools,
+        };
+
+        yield {
+            type: "expert_selected",
+            content: JSON.stringify({
+                expertId: expertProfile.id,
+                label: expertProfile.label,
+                rationale: route.rationale,
+            }),
+        };
+    } else {
+        yield {
+            type: "expert_selected",
+            content: JSON.stringify({
+                expertId: state.expert.id,
+                label: state.expert.label,
+                rationale: state.expert.rationale || "User selected",
+            }),
+        };
+    }
 
     // Generate initial plan (with expert instructions)
     const context = await buildPlannerContext(state);
@@ -290,6 +334,32 @@ export async function* runAgentLoop(
                 content: step.thought,
             };
             state.currentStepIndex++;
+        } else if (step.type === "handoff") {
+            const expertProfile = getExpertProfile(step.expertId as any);
+            state.expert = {
+                id: expertProfile.id,
+                label: expertProfile.label,
+                rationale: step.reason,
+                allowedTools: expertProfile.allowedTools,
+            };
+
+            yield {
+                type: "expert_selected",
+                content: JSON.stringify({
+                    expertId: expertProfile.id,
+                    label: expertProfile.label,
+                    rationale: step.reason,
+                }),
+            };
+
+            const newContext = await buildPlannerContext(state);
+            state.plan = await generatePlan(newContext);
+            state.currentStepIndex = 0;
+
+            yield {
+                type: "plan_created",
+                content: `Handoff to ${expertProfile.id}: ${step.reason}`,
+            };
         } else if (step.type === "tool") {
             const event = await executeToolStep(state, step);
             yield event;
