@@ -12,7 +12,9 @@
     "ingest:dict": "bun scripts/ingest-db-dictionary.ts",
     "db:init": "bun scripts/init-db.ts",
     "seed:analytics": "bun scripts/seed-analytics.ts",
-    "seed:analytics:reset": "bun scripts/seed-analytics.ts --reset"
+    "seed:analytics:reset": "bun scripts/seed-analytics.ts --reset",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.19",
@@ -48,6 +50,7 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.2",
     "eslint-config-next": "16.1.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^4.0.18"
   }
 }

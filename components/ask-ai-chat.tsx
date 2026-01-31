@@ -346,6 +346,11 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
   const [toolNames, setToolNames] = useState<string[]>([]);
   const [autoApproveTools, setAutoApproveTools] = useState<Set<string>>(new Set());
 
+  // Debug panel
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [toolCalls, setToolCalls] = useState<any[]>([]);
+
   const transport = useMemo(() => new AskAIChatTransport({ expertId: expertId === "auto" ? null : expertId }), [expertId]);
 
   const { messages, sendMessage, status, setMessages, stop } = useChat({
@@ -428,10 +433,113 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
   function clearChat() {
     setMessages([]);
     setPendingApprovals(new Map());
+    setConversationId(null);
+    setToolCalls([]);
   }
+
+  async function loadToolCalls() {
+    if (!conversationId) return;
+    const res = await fetch(`/api/debug/tool-calls?conversationId=${encodeURIComponent(conversationId)}`, { cache: "no-store" });
+    const data = await res.json();
+    if (data?.ok) setToolCalls(data.toolCalls || []);
+  }
+
+  useEffect(() => {
+    // Pull conversationId from the latest data-complete message part
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role !== "assistant") continue;
+      for (const part of m.parts) {
+        if (isDataUIPart(part) && part.type === "data-complete") {
+          const cid = (part.data as any)?.conversationId;
+          if (cid && cid !== conversationId) {
+            setConversationId(cid);
+          }
+          return;
+        }
+      }
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    if (debugOpen) {
+      loadToolCalls();
+    }
+  }, [debugOpen, conversationId]);
 
   return (
     <aside className="shrink-0 z-50 sticky h-screen top-0 right-0">
+      {debugOpen && (
+        <div className="fixed inset-0 z-[9998] bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <div className="font-semibold text-sm">Debug</div>
+              <button
+                className="p-1.5 hover:bg-gray-100 rounded-md text-gray-500"
+                onClick={() => setDebugOpen(false)}
+                aria-label="Close debug"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div className="text-xs text-gray-600">
+                ConversationId: <span className="font-mono">{conversationId || "(none)"}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-500">Tool calls (audit log)</div>
+                <button
+                  className="px-2 py-1 text-xs rounded-md border border-gray-200 hover:bg-gray-50"
+                  onClick={loadToolCalls}
+                  disabled={!conversationId}
+                >
+                  Refresh
+                </button>
+              </div>
+
+              <div className="max-h-[55vh] overflow-auto border border-gray-100 rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="text-left p-2">Time</th>
+                      <th className="text-left p-2">Tool</th>
+                      <th className="text-left p-2">Summary</th>
+                      <th className="text-right p-2">tookMs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {toolCalls.length === 0 ? (
+                      <tr>
+                        <td className="p-2 text-gray-500" colSpan={4}>
+                          No tool calls.
+                        </td>
+                      </tr>
+                    ) : (
+                      toolCalls.map((t: any) => (
+                        <tr key={t.id} className="border-t border-gray-100">
+                          <td className="p-2 whitespace-nowrap">{new Date(t.created_at).toLocaleString()}</td>
+                          <td className="p-2 font-mono">{t.tool_name || "-"}</td>
+                          <td className="p-2 text-gray-600">{t.content}</td>
+                          <td className="p-2 text-right font-mono">
+                            {t.tool_output?._meta?.tookMs ?? "-"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="text-[11px] text-gray-500">
+                หมายเหตุ: รายละเอียด tool_input/tool_output เต็ม ๆ ดูได้จาก API `/api/debug/tool-calls`
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {settingsOpen && (
         <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
           <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
@@ -511,6 +619,15 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                 title="Copy chat"
               >
                 <Copy className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Debug"
+                onClick={() => setDebugOpen(true)}
+                className="p-1.5 hover:bg-gray-100 rounded-md text-gray-400 transition-colors"
+                title="Debug"
+              >
+                <span className="text-[11px] font-mono px-1">DBG</span>
               </button>
               <button
                 type="button"
