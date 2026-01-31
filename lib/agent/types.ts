@@ -18,7 +18,7 @@ export interface ThinkStep {
 
 export interface HandoffStep {
     type: "handoff";
-    expertId: "docs" | "sql" | "ops" | "security";
+    expertId: "docs" | "sql" | "ops" | "security" | "review";
     reason: string;
 }
 

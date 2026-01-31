@@ -37,7 +37,7 @@ export async function initAgentState(
     query: string,
     sources?: AgentState["sources"],
     history?: { role: string; content: string }[],
-    expertOverride?: "docs" | "sql" | "ops" | "security" | null
+    expertOverride?: "docs" | "sql" | "ops" | "security" | "review" | null
 ): Promise<AgentState> {
     // Get or create conversation
     let convId = conversationId;

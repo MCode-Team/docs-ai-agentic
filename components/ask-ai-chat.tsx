@@ -3,7 +3,7 @@
 import { useChat, type UIMessage } from "@ai-sdk/react";
 import { isTextUIPart, isDataUIPart, DefaultChatTransport } from "ai";
 import { useState, useMemo, useRef, useEffect } from "react";
-import { ChevronDown, ChevronRight, PlayCircle, CheckCircle2, Sparkles, Trash2, Copy, X, CornerDownLeft, ArrowDown, Square } from "lucide-react";
+import { ChevronDown, ChevronRight, PlayCircle, CheckCircle2, Sparkles, Trash2, Copy, X, CornerDownLeft, ArrowDown, Square, Settings } from "lucide-react";
 import { useStickToBottom } from "use-stick-to-bottom";
 
 interface AskAIChatProps {
@@ -342,6 +342,10 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
   const [input, setInput] = useState("");
   const [expertId, setExpertId] = useState<string>("auto");
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [toolNames, setToolNames] = useState<string[]>([]);
+  const [autoApproveTools, setAutoApproveTools] = useState<Set<string>>(new Set());
+
   const transport = useMemo(() => new AskAIChatTransport({ expertId: expertId === "auto" ? null : expertId }), [expertId]);
 
   const { messages, sendMessage, status, setMessages, stop } = useChat({
@@ -352,6 +356,31 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
   const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
 
   const isLoading = status === "streaming" || status === "submitted";
+
+  async function loadPreferences() {
+    const res = await fetch("/api/preferences");
+    const data = await res.json();
+    if (data?.ok) {
+      setToolNames(data.toolNames || []);
+      const current = (data.preferences?.autoApproveTools || []) as string[];
+      setAutoApproveTools(new Set(current));
+    }
+  }
+
+  async function savePreferences() {
+    await fetch("/api/preferences", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ autoApproveTools: Array.from(autoApproveTools) }),
+    });
+  }
+
+  useEffect(() => {
+    if (settingsOpen) {
+      loadPreferences();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsOpen]);
 
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -403,6 +432,70 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
 
   return (
     <aside className="shrink-0 z-50 sticky h-screen top-0 right-0">
+      {settingsOpen && (
+        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <div className="font-semibold text-sm">Settings</div>
+              <button
+                className="p-1.5 hover:bg-gray-100 rounded-md text-gray-500"
+                onClick={() => setSettingsOpen(false)}
+                aria-label="Close settings"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div className="text-xs text-gray-600">
+                Auto-approve tools (tools อื่น ๆ จะต้องกด Approve ทุกครั้ง). แนะนำเลือกเฉพาะเครื่องมือที่ปลอดภัยสำหรับคุณ.
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[45vh] overflow-auto border border-gray-100 rounded-lg p-3">
+                {toolNames.map((t) => {
+                  const checked = autoApproveTools.has(t);
+                  return (
+                    <label key={t} className="flex items-center gap-2 text-[12px] text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setAutoApproveTools((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(t);
+                            else next.delete(t);
+                            return next;
+                          });
+                        }}
+                      />
+                      <span className="font-mono">{t}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  className="px-3 py-1.5 text-xs rounded-md border border-gray-200 hover:bg-gray-50"
+                  onClick={() => setSettingsOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-3 py-1.5 text-xs rounded-md bg-[#006cff] text-white hover:bg-blue-700"
+                  onClick={async () => {
+                    await savePreferences();
+                    setSettingsOpen(false);
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full h-full">
         <div className="border-l border-gray-200 overflow-hidden justify-end h-screen flex flex-col whitespace-nowrap bg-white">
           {/* Header */}
@@ -418,6 +511,15 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                 title="Copy chat"
               >
                 <Copy className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Settings"
+                onClick={() => setSettingsOpen(true)}
+                className="p-1.5 hover:bg-gray-100 rounded-md text-gray-400 transition-colors"
+                title="Settings"
+              >
+                <Settings className="size-4" />
               </button>
               <button
                 type="button"
@@ -662,6 +764,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                     <option value="sql">SQL</option>
                     <option value="ops">Ops</option>
                     <option value="security">Security</option>
+                    <option value="review">Review</option>
                   </select>
                 </div>
                 <textarea

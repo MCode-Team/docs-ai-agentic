@@ -70,7 +70,7 @@ async function handleAgenticMode(
   conversationId: string | null,
   question: string,
   messages: { role: string; content: string }[],
-  expertId: "docs" | "sql" | "ops" | "security" | null
+  expertId: "docs" | "sql" | "ops" | "security" | "review" | null
 ) {
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
