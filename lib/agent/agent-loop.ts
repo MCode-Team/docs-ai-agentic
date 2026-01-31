@@ -8,6 +8,7 @@ import type {
 } from "./types";
 import type { Message } from "@/lib/memory/types";
 import { generatePlan, shouldReplan } from "./planner";
+import { routeExpert, getExpertProfile } from "./router";
 import { reflect, extractFactsFromConversation, generateConversationTitle } from "./reflector";
 import { toolRegistry, ToolName } from "@/lib/tools/registry";
 import { createPendingToolCall, getPendingToolCall } from "@/lib/approval/runtime";
@@ -77,6 +78,7 @@ export async function initAgentState(
         toolResults: new Map(),
         reflections: [],
         isComplete: false,
+        expert: undefined,
         executionHistory: [],
         attemptCount: 0,
         sources,
@@ -149,6 +151,14 @@ async function buildPlannerContext(
             responseTone: prefs?.responseTone || "friendly",
             customInstructions: prefs?.customInstructions || undefined,
         },
+        expert: state.expert
+            ? {
+                  id: state.expert.id,
+                  label: state.expert.label,
+                  instructions: getExpertProfile(state.expert.id as any)?.plannerInstructions || "",
+                  allowedTools: state.expert.allowedTools,
+              }
+            : undefined,
         lastError,
         executionHistory: state.executionHistory,
     };
@@ -225,7 +235,31 @@ export async function* runAgentLoop(
         content: state.query,
     });
 
-    // Generate initial plan
+    // Select expert (LLM-router)
+    const ctxForRoute = await buildPlannerContext(state);
+    const route = await routeExpert({
+        query: state.query,
+        docsContext: ctxForRoute.docsContext,
+        dictContext: ctxForRoute.dictContext,
+    });
+    const expertProfile = getExpertProfile(route.expertId);
+    state.expert = {
+        id: expertProfile.id,
+        label: expertProfile.label,
+        rationale: route.rationale,
+        allowedTools: expertProfile.allowedTools,
+    };
+
+    yield {
+        type: "expert_selected",
+        content: JSON.stringify({
+            expertId: expertProfile.id,
+            label: expertProfile.label,
+            rationale: route.rationale,
+        }),
+    };
+
+    // Generate initial plan (with expert instructions)
     const context = await buildPlannerContext(state);
     state.plan = await generatePlan(context);
 

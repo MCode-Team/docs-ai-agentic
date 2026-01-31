@@ -23,7 +23,7 @@ function isSourcesPart(part: MessagePart): boolean {
 
 function isStepPart(part: MessagePart): boolean {
   if (!isDataUIPart(part)) return false;
-  return ["data-thinking", "data-step", "data-tool-result", "data-plan"].includes(part.type);
+  return ["data-thinking", "data-expert", "data-step", "data-tool-result", "data-plan"].includes(part.type);
 }
 
 function isToolPendingPart(part: MessagePart): boolean {

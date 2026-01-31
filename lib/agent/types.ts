@@ -33,6 +33,13 @@ export interface AgentState {
     toolResults: Map<string, unknown>;
     reflections: string[];
     isComplete: boolean;
+    /** Selected expert for this turn (multi-agent) */
+    expert?: {
+        id: string;
+        label: string;
+        rationale?: string;
+        allowedTools: string[];
+    };
     /** Track execution history for replanning */
     executionHistory: Array<{
         step: PlanStep;
@@ -49,6 +56,7 @@ export interface AgentState {
 }
 
 export type AgentEventType =
+    | "expert_selected"
     | "plan_created"
     | "step_started"
     | "tool_pending"
@@ -91,6 +99,13 @@ export interface PlannerContext {
         language: string;
         responseTone: string;
         customInstructions?: string;
+    };
+    /** Selected expert persona (multi-agent) */
+    expert?: {
+        id: string;
+        label: string;
+        instructions: string;
+        allowedTools: string[];
     };
     /** Error message from last tool execution, used for retry */
     lastError?: string;
