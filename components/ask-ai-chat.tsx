@@ -3,7 +3,7 @@
 import { useChat, type UIMessage } from "@ai-sdk/react";
 import { isTextUIPart, isDataUIPart, DefaultChatTransport } from "ai";
 import { useState, useMemo, useRef, useEffect } from "react";
-import { ChevronDown, ChevronRight, PlayCircle, CheckCircle2, Sparkles, Trash2, Copy, X, CornerDownLeft, ArrowDown, Square } from "lucide-react";
+import { ChevronDown, ChevronRight, PlayCircle, CheckCircle2, Sparkles, Trash2, Copy, X, CornerDownLeft, ArrowDown, Square, Settings } from "lucide-react";
 import { useStickToBottom } from "use-stick-to-bottom";
 
 interface AskAIChatProps {
@@ -272,6 +272,26 @@ function Steps({ steps }: { steps: Array<{ type: string; data: Record<string, un
                 </div>
               );
             }
+            if (step.type === "data-expert") {
+              let label = "Expert";
+              let rationale = "";
+              try {
+                const parsed = JSON.parse((step.data as any).expert);
+                label = `${parsed.label || parsed.expertId}`;
+                rationale = parsed.rationale ? ` — ${parsed.rationale}` : "";
+              } catch {
+                label = String((step.data as any).expert);
+              }
+              return (
+                <div key={idx} className="text-[11px] text-gray-700 flex items-center gap-2.5 pl-1 justify-between group">
+                  <div className="flex items-center gap-2.5">
+                    <Sparkles className="w-3 h-3 text-purple-600 shrink-0" />
+                    <span className="font-mono bg-white px-1 rounded border border-gray-100">Expert: {label}{rationale}</span>
+                  </div>
+                  {duration && <span className="text-[10px] text-gray-400 font-mono shrink-0">{duration}</span>}
+                </div>
+              );
+            }
             if (step.type === "data-tool-result") {
               return (
                 <div key={idx} className="text-[11px] text-gray-600 flex items-start gap-2.5 pl-1 opacity-75">
@@ -290,10 +310,12 @@ function Steps({ steps }: { steps: Array<{ type: string; data: Record<string, un
 
 // Custom transport that extends DefaultChatTransport
 class AskAIChatTransport extends DefaultChatTransport<UIMessage> {
-  constructor() {
+  private expertId: string | null;
+
+  constructor(opts: { expertId: string | null }) {
     super({
       api: "/api/ask-ai",
-      body: { agentic: true },
+      body: { agentic: true, expertId: opts.expertId },
       prepareSendMessagesRequest: async ({ messages }) => {
         return {
           body: {
@@ -305,18 +327,31 @@ class AskAIChatTransport extends DefaultChatTransport<UIMessage> {
                 .join(""),
             })),
             agentic: true,
+            expertId: opts.expertId,
           },
         };
       },
     });
+
+    this.expertId = opts.expertId;
   }
 }
 
 export function AskAIChat({ onClose }: AskAIChatProps) {
   const [pendingApprovals, setPendingApprovals] = useState<Map<string, { status: "pending" | "approved" | "rejected" }>>(new Map());
   const [input, setInput] = useState("");
+  const [expertId, setExpertId] = useState<string>("auto");
 
-  const transport = useMemo(() => new AskAIChatTransport(), []);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [toolNames, setToolNames] = useState<string[]>([]);
+  const [autoApproveTools, setAutoApproveTools] = useState<Set<string>>(new Set());
+
+  // Debug panel
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [toolCalls, setToolCalls] = useState<any[]>([]);
+
+  const transport = useMemo(() => new AskAIChatTransport({ expertId: expertId === "auto" ? null : expertId }), [expertId]);
 
   const { messages, sendMessage, status, setMessages, stop } = useChat({
     id: "ask-ai-chat",
@@ -326,6 +361,31 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
   const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
 
   const isLoading = status === "streaming" || status === "submitted";
+
+  async function loadPreferences() {
+    const res = await fetch("/api/preferences");
+    const data = await res.json();
+    if (data?.ok) {
+      setToolNames(data.toolNames || []);
+      const current = (data.preferences?.autoApproveTools || []) as string[];
+      setAutoApproveTools(new Set(current));
+    }
+  }
+
+  async function savePreferences() {
+    await fetch("/api/preferences", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ autoApproveTools: Array.from(autoApproveTools) }),
+    });
+  }
+
+  useEffect(() => {
+    if (settingsOpen) {
+      loadPreferences();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsOpen]);
 
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -373,10 +433,177 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
   function clearChat() {
     setMessages([]);
     setPendingApprovals(new Map());
+    setConversationId(null);
+    setToolCalls([]);
   }
+
+  async function loadToolCalls() {
+    if (!conversationId) return;
+    const res = await fetch(`/api/debug/tool-calls?conversationId=${encodeURIComponent(conversationId)}`, { cache: "no-store" });
+    const data = await res.json();
+    if (data?.ok) setToolCalls(data.toolCalls || []);
+  }
+
+  useEffect(() => {
+    // Pull conversationId from the latest data-complete message part
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role !== "assistant") continue;
+      for (const part of m.parts) {
+        if (isDataUIPart(part) && part.type === "data-complete") {
+          const cid = (part.data as any)?.conversationId;
+          if (cid && cid !== conversationId) {
+            setConversationId(cid);
+          }
+          return;
+        }
+      }
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    if (debugOpen) {
+      loadToolCalls();
+    }
+  }, [debugOpen, conversationId]);
 
   return (
     <aside className="shrink-0 z-50 sticky h-screen top-0 right-0">
+      {debugOpen && (
+        <div className="fixed inset-0 z-[9998] bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <div className="font-semibold text-sm">Debug</div>
+              <button
+                className="p-1.5 hover:bg-gray-100 rounded-md text-gray-500"
+                onClick={() => setDebugOpen(false)}
+                aria-label="Close debug"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div className="text-xs text-gray-600">
+                ConversationId: <span className="font-mono">{conversationId || "(none)"}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-500">Tool calls (audit log)</div>
+                <button
+                  className="px-2 py-1 text-xs rounded-md border border-gray-200 hover:bg-gray-50"
+                  onClick={loadToolCalls}
+                  disabled={!conversationId}
+                >
+                  Refresh
+                </button>
+              </div>
+
+              <div className="max-h-[55vh] overflow-auto border border-gray-100 rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="text-left p-2">Time</th>
+                      <th className="text-left p-2">Tool</th>
+                      <th className="text-left p-2">Summary</th>
+                      <th className="text-right p-2">tookMs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {toolCalls.length === 0 ? (
+                      <tr>
+                        <td className="p-2 text-gray-500" colSpan={4}>
+                          No tool calls.
+                        </td>
+                      </tr>
+                    ) : (
+                      toolCalls.map((t: any) => (
+                        <tr key={t.id} className="border-t border-gray-100">
+                          <td className="p-2 whitespace-nowrap">{new Date(t.created_at).toLocaleString()}</td>
+                          <td className="p-2 font-mono">{t.tool_name || "-"}</td>
+                          <td className="p-2 text-gray-600">{t.content}</td>
+                          <td className="p-2 text-right font-mono">
+                            {t.tool_output?._meta?.tookMs ?? "-"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="text-[11px] text-gray-500">
+                หมายเหตุ: รายละเอียด tool_input/tool_output เต็ม ๆ ดูได้จาก API `/api/debug/tool-calls`
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <div className="font-semibold text-sm">Settings</div>
+              <button
+                className="p-1.5 hover:bg-gray-100 rounded-md text-gray-500"
+                onClick={() => setSettingsOpen(false)}
+                aria-label="Close settings"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div className="text-xs text-gray-600">
+                Auto-approve tools (tools อื่น ๆ จะต้องกด Approve ทุกครั้ง). แนะนำเลือกเฉพาะเครื่องมือที่ปลอดภัยสำหรับคุณ.
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[45vh] overflow-auto border border-gray-100 rounded-lg p-3">
+                {toolNames.map((t) => {
+                  const checked = autoApproveTools.has(t);
+                  return (
+                    <label key={t} className="flex items-center gap-2 text-[12px] text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setAutoApproveTools((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(t);
+                            else next.delete(t);
+                            return next;
+                          });
+                        }}
+                      />
+                      <span className="font-mono">{t}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  className="px-3 py-1.5 text-xs rounded-md border border-gray-200 hover:bg-gray-50"
+                  onClick={() => setSettingsOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-3 py-1.5 text-xs rounded-md bg-[#006cff] text-white hover:bg-blue-700"
+                  onClick={async () => {
+                    await savePreferences();
+                    setSettingsOpen(false);
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full h-full">
         <div className="border-l border-gray-200 overflow-hidden justify-end h-screen flex flex-col whitespace-nowrap bg-white">
           {/* Header */}
@@ -392,6 +619,24 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                 title="Copy chat"
               >
                 <Copy className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Debug"
+                onClick={() => setDebugOpen(true)}
+                className="p-1.5 hover:bg-gray-100 rounded-md text-gray-400 transition-colors"
+                title="Debug"
+              >
+                <span className="text-[11px] font-mono px-1">DBG</span>
+              </button>
+              <button
+                type="button"
+                aria-label="Settings"
+                onClick={() => setSettingsOpen(true)}
+                className="p-1.5 hover:bg-gray-100 rounded-md text-gray-400 transition-colors"
+                title="Settings"
+              >
+                <Settings className="size-4" />
               </button>
               <button
                 type="button"
@@ -622,6 +867,23 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                 onSubmit={handleSubmit}
                 className="flex flex-col"
               >
+                <div className="flex items-center justify-between px-4 pt-3">
+                  <div className="text-[11px] text-gray-500">Expert</div>
+                  <select
+                    value={expertId}
+                    onChange={(e) => setExpertId(e.target.value)}
+                    className="text-[12px] border border-gray-200 rounded-md px-2 py-1 bg-white"
+                    disabled={isLoading}
+                    aria-label="Select expert"
+                  >
+                    <option value="auto">Auto (Router)</option>
+                    <option value="docs">Docs</option>
+                    <option value="sql">SQL</option>
+                    <option value="ops">Ops</option>
+                    <option value="security">Security</option>
+                    <option value="review">Review</option>
+                  </select>
+                </div>
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -632,7 +894,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                     }
                   }}
                   placeholder="What would you like to know?"
-                  className="w-full bg-transparent p-4 pb-14 text-[13px] resize-none outline-none placeholder:text-gray-400 min-h-[120px]"
+                  className="w-full bg-transparent p-4 pb-14 pt-3 text-[13px] resize-none outline-none placeholder:text-gray-400 min-h-[120px]"
                   disabled={isLoading}
                 />
                 <div className="absolute bottom-3 left-4 text-[11px] text-gray-400">

@@ -15,10 +15,11 @@ Experts:
 - sql: questions about databases, schemas, analytics, data dictionary, queries, KPIs.
 - ops: questions about running/debugging/building/deploying the system, Docker, environment variables, file/code operations.
 - security: questions about governance, RBAC, permissions, audit logs, privacy, threat modeling, safe tool use.
+- review: code review requests, PR review, architecture review, bug-finding, refactor suggestions.
 
 Rules:
 - Return STRICT JSON only.
-- Output shape: {"expertId": "docs|sql|ops|security", "rationale": "..."}
+- Output shape: {"expertId": "docs|sql|ops|security|review", "rationale": "..."}
 - Keep rationale under 2 sentences.
 `;
 

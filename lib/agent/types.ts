@@ -2,7 +2,7 @@
 
 import type { Message } from "@/lib/memory/types";
 
-export type PlanStepType = "tool" | "think" | "answer";
+export type PlanStepType = "tool" | "think" | "handoff" | "answer";
 
 export interface ToolStep {
     type: "tool";
@@ -16,12 +16,18 @@ export interface ThinkStep {
     thought: string;
 }
 
+export interface HandoffStep {
+    type: "handoff";
+    expertId: "docs" | "sql" | "ops" | "security" | "review";
+    reason: string;
+}
+
 export interface AnswerStep {
     type: "answer";
     content: string;
 }
 
-export type PlanStep = ToolStep | ThinkStep | AnswerStep;
+export type PlanStep = ToolStep | ThinkStep | HandoffStep | AnswerStep;
 
 export interface AgentState {
     conversationId: string;

@@ -48,18 +48,15 @@ export async function updateUserPreferences(
 const SAFE_TOOLS = [
     'getSalesSummary',
     'getOrderStatusCounts',
-    'analyzeData'
+    'analyzeData',
+    // Analytics aggregate tool is designed to return summarized results only
+    'queryAggregate'
 ];
 
 export async function shouldAutoApproveTool(
     userId: string,
     toolName: string
 ): Promise<boolean> {
-    // Always auto-approve everything as requested
-    return true;
-
-    // Original logic disabled:
-    /*
     // Always approve safe tools
     if (SAFE_TOOLS.includes(toolName)) {
         return true;
@@ -68,5 +65,4 @@ export async function shouldAutoApproveTool(
     const prefs = await getUserPreferences(userId);
     if (!prefs) return false;
     return prefs.autoApproveTools.includes(toolName);
-    */
 }

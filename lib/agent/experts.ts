@@ -1,4 +1,4 @@
-export type ExpertId = "router" | "docs" | "sql" | "ops" | "security";
+export type ExpertId = "router" | "docs" | "sql" | "ops" | "security" | "review";
 
 export interface ExpertProfile {
   id: ExpertId;
@@ -37,6 +37,14 @@ export const EXPERTS: Record<ExpertId, ExpertProfile> = {
       "getSalesSummary",
       "getOrderStatusCounts",
       "getOrders",
+      "queryAggregate",
+      "trendReport",
+      "cohortReport",
+      "oosReport",
+      "exportExcelArtifact",
+      "buildTopSkuWorkbook",
+      "buildOosWorkbook",
+      "buildCohortWorkbook",
       "analyzeData",
       "executeCode",
     ],
@@ -57,6 +65,14 @@ export const EXPERTS: Record<ExpertId, ExpertProfile> = {
       "คุณคือ Security/Governance Expert: โฟกัส threat model, data privacy, RBAC/ABAC, audit logging, safe tool permissions, prompt injection defense, และแนวทางนำไปใช้ในองค์กร. ให้ checklist และมาตรการที่ทำได้จริง.",
     allowedTools: ["readFile"],
   },
+  review: {
+    id: "review",
+    label: "Code Review Expert",
+    description: "รีวิวโค้ด: หา bug/edge cases, ปรับสถาปัตยกรรม, ความปลอดภัย, readability, performance, และ DX",
+    plannerInstructions:
+      "คุณคือ Code Review Expert: ให้ feedback แบบ actionable พร้อมเหตุผล, ระบุไฟล์/ฟังก์ชันที่เกี่ยวข้อง, เสนอ patch แนวทางแก้, และชี้ความเสี่ยง (security/perf). ถ้าต้องดูโค้ดให้ใช้ readFile/bash. หลีกเลี่ยงการเดาเมื่อยังไม่เห็นโค้ด.",
+    allowedTools: ["bash", "readFile"],
+  },
 };
 
-export const ROUTABLE_EXPERT_IDS: ExpertId[] = ["docs", "sql", "ops", "security"];
+export const ROUTABLE_EXPERT_IDS: ExpertId[] = ["docs", "sql", "ops", "security", "review"];
