@@ -16,6 +16,7 @@ export default function DemoDashboard() {
   const [status, setStatus] = useState<string>("");
   const [lastLink, setLastLink] = useState<string | null>(null);
   const [dq, setDq] = useState<any>(null);
+  const [summary, setSummary] = useState<any>(null);
 
   async function run(endpoint: string, body: any) {
     setStatus("Running...");
@@ -31,17 +32,25 @@ export default function DemoDashboard() {
       setStatus(`Done: ${data.filename} (expires ${data.expiresAt})`);
     } else if (data?.ok) {
       setStatus("Done");
-      setDq(data);
+      if (endpoint.includes("data-quality")) setDq(data);
+      if (endpoint.includes("/summary")) setSummary(data.summary);
     } else {
       setStatus(`Error: ${data?.error || "unknown"}`);
     }
   }
 
   useEffect(() => {
-    // initial data quality
+    // initial data quality + summary
     run("/api/reports/data-quality", { days: 30 });
+    run("/api/reports/summary", { dateFrom, dateTo });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    // refresh summary when date range changes
+    run("/api/reports/summary", { dateFrom, dateTo });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo]);
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
@@ -53,6 +62,35 @@ export default function DemoDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="border border-gray-200 rounded-lg p-3 md:col-span-3">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+            <div className="bg-gray-50 border border-gray-100 rounded p-2">
+              <div className="text-[11px] text-gray-500">Orders</div>
+              <div className="text-sm font-semibold">{summary?.order_count?.toLocaleString?.() ?? "-"}</div>
+            </div>
+            <div className="bg-gray-50 border border-gray-100 rounded p-2">
+              <div className="text-[11px] text-gray-500">Customers</div>
+              <div className="text-sm font-semibold">{summary?.customer_count?.toLocaleString?.() ?? "-"}</div>
+            </div>
+            <div className="bg-gray-50 border border-gray-100 rounded p-2">
+              <div className="text-[11px] text-gray-500">Net Sales</div>
+              <div className="text-sm font-semibold">{summary?.net_sales?.toLocaleString?.() ?? "-"}</div>
+            </div>
+            <div className="bg-gray-50 border border-gray-100 rounded p-2">
+              <div className="text-[11px] text-gray-500">Cost</div>
+              <div className="text-sm font-semibold">{summary?.cost?.toLocaleString?.() ?? "-"}</div>
+            </div>
+            <div className="bg-gray-50 border border-gray-100 rounded p-2">
+              <div className="text-[11px] text-gray-500">Gross Profit</div>
+              <div className="text-sm font-semibold">{summary?.gross_profit?.toLocaleString?.() ?? "-"}</div>
+            </div>
+            <div className="bg-gray-50 border border-gray-100 rounded p-2">
+              <div className="text-[11px] text-gray-500">GP%</div>
+              <div className="text-sm font-semibold">{summary?.gp_margin != null ? `${(summary.gp_margin * 100).toFixed(1)}%` : "-"}</div>
+            </div>
+          </div>
+        </div>
+
         <div className="border border-gray-200 rounded-lg p-3">
           <div className="text-xs text-gray-500 mb-2">Date From</div>
           <input className="border rounded px-2 py-1 w-full" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
