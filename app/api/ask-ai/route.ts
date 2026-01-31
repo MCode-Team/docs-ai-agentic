@@ -108,6 +108,14 @@ async function handleAgenticMode(
               } as any);
               break;
 
+            case "expert_selected":
+              writer.write({
+                type: "data-expert",
+                id: generateId(),
+                data: { expert: event.content },
+              } as any);
+              break;
+
             case "plan_created":
               writer.write({
                 type: "data-plan",

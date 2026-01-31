@@ -29,7 +29,7 @@ function getToolDescriptions(): string {
         .join("\n");
 }
 
-const PLANNER_SYSTEM_PROMPT = `คุณคือ AI Planner ที่วางแผนการตอบคำถาม
+const PLANNER_SYSTEM_PROMPT = `คุณคือ AI Planner ที่วางแผนการตอบคำถาม (รองรับ multi-agent expert)
 
 วิเคราะห์คำถามและสร้าง plan เป็น JSON array ของ steps:
 
@@ -60,6 +60,7 @@ Step types:
  */
 export async function generatePlan(context: PlannerContext): Promise<PlanStep[]> {
     const toolDescriptions = getToolDescriptions();
+    const allowedTools = context.expert?.allowedTools ?? null;
 
     const userContext = `
 User Query: ${context.query}
@@ -80,6 +81,9 @@ User Preferences:
 - Language: ${context.userPreferences.language}
 - Tone: ${context.userPreferences.responseTone}
 ${context.userPreferences.customInstructions ? `- Custom: ${context.userPreferences.customInstructions}` : ""}
+
+Selected Expert:
+${context.expert ? `- id: ${context.expert.id}\n- label: ${context.expert.label}\n- instructions: ${context.expert.instructions}` : "(none)"}
 ${context.lastError ? `
 ⚠️ PREVIOUS TOOL ERROR (ต้องแก้ไข):
 ${context.lastError}
@@ -109,7 +113,7 @@ ${toolDescriptions}
 
     try {
         const plan = JSON.parse(result.text) as PlanStep[];
-        return validatePlan(plan);
+        return validatePlan(plan, allowedTools);
     } catch {
         // Fallback: simple answer
         return [{ type: "answer", content: result.text }];
@@ -119,7 +123,7 @@ ${toolDescriptions}
 /**
  * Validate and fix plan structure
  */
-function validatePlan(plan: PlanStep[]): PlanStep[] {
+function validatePlan(plan: PlanStep[], allowedTools: string[] | null): PlanStep[] {
     if (!Array.isArray(plan) || plan.length === 0) {
         return [{ type: "answer", content: "ไม่สามารถสร้าง plan ได้" }];
     }
@@ -130,10 +134,17 @@ function validatePlan(plan: PlanStep[]): PlanStep[] {
         plan.push({ type: "answer", content: "..." });
     }
 
-    // Validate tool steps
+    // Validate tool steps (+ optional per-expert allowlist)
     return plan.filter((step) => {
         if (step.type === "tool") {
-            return step.toolName && step.toolName in toolRegistry;
+            const ok = step.toolName && step.toolName in toolRegistry;
+            if (!ok) return false;
+            if (allowedTools && allowedTools.length > 0) {
+                return allowedTools.includes(step.toolName);
+            }
+            // If allowedTools is [], disallow all tools.
+            if (allowedTools && allowedTools.length === 0) return false;
+            return true;
         }
         return true;
     });
