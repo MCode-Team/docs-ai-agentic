@@ -233,9 +233,6 @@ export const queryAggregateTool = tool({
     const orderDir = input.orderBy?.direction || "desc";
 
     const sql = `
-      BEGIN;
-      SET LOCAL statement_timeout = '5000ms';
-
       SELECT
         ${selectParts.join(",\n        ")}
       ${fromSql}
@@ -243,20 +240,16 @@ export const queryAggregateTool = tool({
       ${where.length ? "WHERE " + where.join(" AND ") : ""}
       ${groupParts.length ? "GROUP BY " + groupParts.join(", ") : ""}
       ORDER BY ${orderByField} ${orderDir}
-      LIMIT ${limit};
-
-      COMMIT;
+      LIMIT ${limit}
     `;
 
-    // Use unsafe for dynamic SQL, but keep inputs parameterized and identifiers allowlisted.
-    // Rows are returned from the SELECT statement.
-    const rows = await db.unsafe(sql, params);
+    // Transaction wrapper so we can reliably apply statement_timeout and return a single result set.
+    const rows = await (db as any).begin(async (tx: any) => {
+      await tx`SET LOCAL statement_timeout = '15000ms'`;
+      // Use unsafe for dynamic SQL, but keep inputs parameterized and identifiers allowlisted.
+      return await tx.unsafe(sql, params);
+    });
 
-    // postgres.js may return results for multiple statements; prefer last non-empty array.
-    const data = Array.isArray(rows)
-      ? rows
-      : (rows as any[]);
-
-    return { ok: true, dataset, rowCount: (data as any[]).length, rows: data };
+    return { ok: true, dataset, rowCount: rows.length, rows };
   },
 } as any);
