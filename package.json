@@ -11,6 +11,7 @@
     "ingest:docs": "bun scripts/ingest-docs.ts",
     "ingest:dict": "bun scripts/ingest-db-dictionary.ts",
     "db:init": "bun scripts/init-db.ts",
+    "db:migrate": "bun scripts/migrate-db.ts",
     "seed:analytics": "bun scripts/seed-analytics.ts",
     "seed:analytics:reset": "bun scripts/seed-analytics.ts --reset",
     "test": "vitest run",
