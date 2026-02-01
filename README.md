@@ -24,6 +24,11 @@
 - **Process Visualization**: แสดงกระบวนการ "คิด" (Thinking), ขั้นตอนการทำงาน, และการเรียกใช้ Tools ของ Agent ให้ผู้ใช้เห็นภาพ
 - **Rich Citations**: มีลิงก์อ้างอิงกลับไปยังเอกสารต้นทางและ Data Dictionary ที่ถูกใช้งานในการตอบคำถาม
 
+### 4. Bootstrap / Trigger Prompt (ย้ายบริบทส่วนตัวแบบครั้งเดียว)
+เพิ่ม endpoint สำหรับแนวคิด “Trigger Prompt” เพื่อดึงข้อมูลจาก AI ตัวเดิมที่คุยกับคุณมานาน แล้ว import เข้า memory ของระบบนี้ได้ทันที
+- `GET /api/bootstrap?lang=th|en` → ได้ prompt template
+- `POST /api/bootstrap` → ส่ง JSON ที่ได้จาก AI ตัวเดิม เพื่อ import เป็น `memory_facts` + `user_preferences`
+
 ## 🛠️ Tech Stack
 - **Framework**: Next.js 15+ (App Router)
 - **AI**: Vercel AI SDK (Core + React), OpenAI
