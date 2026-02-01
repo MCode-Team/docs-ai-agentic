@@ -10,9 +10,14 @@ services:
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - SANDBOX_URL=http://sandbox:8000
+      - MEMORY_MAINTENANCE_DELAY_MIN=${MEMORY_MAINTENANCE_DELAY_MIN:-10}
+      - CRON_SECRET=${CRON_SECRET:-}
     depends_on:
       - db
       - sandbox
+    # Ensure DB migrations are applied on every (re)start.
+    # Safe because migrations use IF NOT EXISTS.
+    command: ["sh", "-lc", "npm run db:migrate && npm run start"]
     restart: unless-stopped
 
   db:
