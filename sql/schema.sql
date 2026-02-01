@@ -161,6 +161,18 @@ CREATE TABLE IF NOT EXISTS user_daily_memory (
 
 CREATE INDEX IF NOT EXISTS idx_user_daily_memory_user_day ON user_daily_memory(user_id, day);
 
+-- Queue for event-driven memory maintenance (summarize daily logs into MEMORY.md)
+CREATE TABLE IF NOT EXISTS memory_maintenance_queue (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  run_after TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'running' | 'done' | 'error'
+  last_error TEXT,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_memory_maintenance_queue_run_after
+ON memory_maintenance_queue(status, run_after);
+
 -- =====================================================
 -- ANALYTICS (Orders / Sales Lines / Inventory)
 -- =====================================================

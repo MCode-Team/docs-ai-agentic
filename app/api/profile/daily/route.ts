@@ -75,7 +75,19 @@ export async function PUT(req: Request) {
   }
 
   const updated = await updateDailyMemory(user.id, day, { content: body.content });
-  const res = NextResponse.json({ ok: true, day: updated });
+
+  // Event-driven memory maintenance: schedule a refresh of MEMORY.md after daily update.
+  // This is safe for anonymous SaaS: one job per user (upsert).
+  const delayMin = Math.max(1, Math.min(60, Number(process.env.MEMORY_MAINTENANCE_DELAY_MIN || 10)));
+  const { db } = await import("@/lib/db");
+  await db`
+    INSERT INTO memory_maintenance_queue (user_id, run_after, status, updated_at)
+    VALUES (${user.id}, now() + (${delayMin} * interval '1 minute'), 'pending', now())
+    ON CONFLICT (user_id)
+    DO UPDATE SET run_after = EXCLUDED.run_after, status = 'pending', last_error = NULL, updated_at = now()
+  `;
+
+  const res = NextResponse.json({ ok: true, day: updated, scheduledMaintenanceInMin: delayMin });
   if (!existing) {
     res.cookies.set({
       name: USER_COOKIE_NAME,
