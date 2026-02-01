@@ -76,10 +76,22 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
                             Profile
                         </a>
                         <a
+                            href="/profile/daily"
+                            className="px-3 py-1.5 rounded-md text-[13px] font-medium border border-border text-gray-700 hover:text-black hover:bg-gray-50"
+                        >
+                            Daily
+                        </a>
+                        <a
                             href="/onboard"
                             className="px-3 py-1.5 rounded-md text-[13px] font-medium border border-border text-gray-700 hover:text-black hover:bg-gray-50"
                         >
                             Onboard
+                        </a>
+                        <a
+                            href="/profile/portability"
+                            className="px-3 py-1.5 rounded-md text-[13px] font-medium border border-border text-gray-700 hover:text-black hover:bg-gray-50"
+                        >
+                            Export
                         </a>
 
                         {/* Ask AI Button */}

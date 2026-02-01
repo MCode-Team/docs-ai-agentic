@@ -98,6 +98,9 @@ export default function ProfilePage() {
 
         <div className="flex items-center gap-2">
           <a className="text-sm text-blue-600 hover:underline" href="/onboard">Onboard in 5 seconds</a>
+          <a className="text-sm text-blue-600 hover:underline" href="/profile/daily">Daily memory</a>
+          <a className="text-sm text-blue-600 hover:underline" href="/profile/memory">Memory tools</a>
+          <a className="text-sm text-blue-600 hover:underline" href="/profile/portability">Export/Import</a>
           <a className="text-sm text-blue-600 hover:underline" href="/docs/getting-started">Back to Docs</a>
         </div>
       </div>
