@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   const user = await getOrCreateUser(userCode);
 
   const body = await req.json();
-  const { autoApproveTools = [] } = body as { autoApproveTools?: string[] };
+  const { autoApproveTools = [], autoApproveAllTools = false } = body as { autoApproveTools?: string[]; autoApproveAllTools?: boolean };
 
   // Validate tool names + block dangerous tools from auto-approve
   const allowed = new Set(Object.keys(toolRegistry));
@@ -34,7 +34,9 @@ export async function POST(req: Request) {
 
   const updated = await updateUserPreferences(user.id, {
     autoApproveTools: cleaned,
-  });
+    // if true, approvals become fully automatic except blocked tools
+    autoApproveAllTools: Boolean(autoApproveAllTools),
+  } as any);
 
   return NextResponse.json({ ok: true, preferences: updated });
 }

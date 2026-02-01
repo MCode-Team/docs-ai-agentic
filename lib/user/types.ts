@@ -15,6 +15,8 @@ export interface UserPreferences {
     language: "th" | "en";
     responseTone: "friendly" | "formal" | "concise";
     autoApproveTools: string[];
+    /** If true, auto-approve all tools except blocked ones (dangerous tools never auto-approved). */
+    autoApproveAllTools: boolean;
     customInstructions: string | null;
     updatedAt: Date;
 }

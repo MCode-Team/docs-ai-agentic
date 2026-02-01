@@ -71,7 +71,8 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
   language TEXT DEFAULT 'th',           -- 'th' | 'en'
   response_tone TEXT DEFAULT 'friendly', -- 'friendly' | 'formal' | 'concise'
-  auto_approve_tools TEXT[] DEFAULT '{}', -- tools to auto-approve
+  auto_approve_tools TEXT[] DEFAULT '{}', -- tools to auto-approve (allowlist)
+  auto_approve_all_tools BOOLEAN DEFAULT true, -- if true: auto-approve all tools except blocked ones
   custom_instructions TEXT,              -- custom system prompt
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(user_id)
