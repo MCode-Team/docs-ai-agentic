@@ -100,6 +100,11 @@ export interface PlannerContext {
     docsContext: string;
     dictContext: string;
     factsContext: string;
+    /**
+     * OpenClaw-style core context (IDENTITY/USER/SOUL/MEMORY + recent daily logs)
+     * Stored per-user in DB for multi-tenant SaaS safety.
+     */
+    coreContext?: string;
     recentMessages: Message[];
     userPreferences: {
         language: string;

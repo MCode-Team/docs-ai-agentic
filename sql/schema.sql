@@ -132,6 +132,36 @@ CREATE TABLE IF NOT EXISTS tool_approvals (
 CREATE INDEX IF NOT EXISTS idx_tool_approvals_status ON tool_approvals(status);
 
 -- =====================================================
+-- OPENCLAW-STYLE CORE FILES (per-user, multi-tenant)
+-- =====================================================
+
+-- Stores the canonical "core files" (IDENTITY/USER/SOUL/MEMORY) like OpenClaw,
+-- but per-user in DB for SaaS safety.
+CREATE TABLE IF NOT EXISTS user_core_files (
+  id BIGSERIAL PRIMARY KEY,
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  file_key TEXT NOT NULL, -- 'IDENTITY' | 'USER' | 'SOUL' | 'MEMORY'
+  content TEXT NOT NULL DEFAULT '',
+  version INT NOT NULL DEFAULT 1,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, file_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_core_files_user ON user_core_files(user_id);
+
+-- Daily memory logs like OpenClaw's memory/YYYY-MM-DD.md
+CREATE TABLE IF NOT EXISTS user_daily_memory (
+  id BIGSERIAL PRIMARY KEY,
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  day DATE NOT NULL,
+  content TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, day)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_daily_memory_user_day ON user_daily_memory(user_id, day);
+
+-- =====================================================
 -- ANALYTICS (Orders / Sales Lines / Inventory)
 -- =====================================================
 

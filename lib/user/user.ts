@@ -43,6 +43,17 @@ export async function getOrCreateUser(userCode?: string): Promise<User> {
     VALUES (${id})
   `;
 
+    // Create default OpenClaw-style core files
+    await db`
+    INSERT INTO user_core_files (user_id, file_key, content)
+    VALUES
+      (${id}, 'IDENTITY', ''),
+      (${id}, 'USER', ''),
+      (${id}, 'SOUL', ''),
+      (${id}, 'MEMORY', '')
+    ON CONFLICT (user_id, file_key) DO NOTHING
+  `;
+
     return user;
 }
 

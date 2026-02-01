@@ -22,6 +22,8 @@ import {
     getUserFacts,
     updateConversationTitle,
 } from "@/lib/memory";
+import { getCoreFiles, getRecentDailyMemories } from "@/lib/profile";
+import { renderOpenClawStyleContext } from "@/lib/profile/context";
 import { retrieveDocs } from "@/lib/retrieval-docs";
 import { retrieveDictionary } from "@/lib/retrieval-dictionary";
 import { rerankZeroRank2 } from "@/lib/rerank-zerank2";
@@ -131,7 +133,18 @@ async function buildPlannerContext(
         return dictCandidates.slice(0, 4);
     })();
 
-    // Retrieve user facts
+    // Load OpenClaw-style core files (DB-backed, per-user)
+    const core = await getCoreFiles(state.userId);
+    const daily = await getRecentDailyMemories(state.userId, 3);
+    const coreContext = renderOpenClawStyleContext({
+        identity: core.IDENTITY,
+        user: core.USER,
+        soul: core.SOUL,
+        memory: core.MEMORY,
+        daily,
+    });
+
+    // Retrieve user facts (auto-extracted)
     const userFacts = await getUserFacts(state.userId, 10);
 
     // Get user preferences
@@ -154,6 +167,7 @@ async function buildPlannerContext(
         docsContext,
         dictContext,
         factsContext,
+        coreContext,
         recentMessages: state.messages.slice(-10),
         userPreferences: {
             language: prefs?.language || "th",

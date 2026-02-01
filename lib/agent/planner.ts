@@ -71,13 +71,16 @@ export async function generatePlan(context: PlannerContext): Promise<PlanStep[]>
     const userContext = `
 User Query: ${context.query}
 
+OpenClaw Core Context (IDENTITY/USER/SOUL/MEMORY):
+${context.coreContext || "(empty)"}
+
 Docs Context:
 ${context.docsContext || "(ไม่มี)"}
 
 DB Dictionary:
 ${context.dictContext || "(ไม่มี)"}
 
-User Facts:
+User Facts (auto-extracted):
 ${context.factsContext || "(ไม่มี)"}
 
 Recent Conversation:

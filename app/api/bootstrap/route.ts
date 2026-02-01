@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getOrCreateUser, updateUser, getUserPreferences, updateUserPreferences } from "@/lib/user";
 import { createFact } from "@/lib/memory";
+import { updateCoreFile } from "@/lib/profile";
 
 const USER_COOKIE_NAME = "user_code";
 
@@ -174,7 +175,46 @@ export async function POST(req: Request) {
     });
   }
 
-  // 3) Import facts
+  // 3) OpenClaw-style core files (write to user_core_files)
+  // Build markdown content so the agent can read it every turn.
+  const identityMd = [
+    body.identity?.name ? `- Name: ${body.identity.name}` : null,
+    body.identity?.role ? `- Role: ${body.identity.role}` : null,
+    body.identity?.tone ? `- Vibe/Tone: ${body.identity.tone}` : null,
+  ].filter(Boolean).join("\n");
+
+  const userMd = [
+    body.user?.displayName ? `- Name: ${body.user.displayName}` : null,
+    body.user?.timezone ? `- Timezone: ${body.user.timezone}` : null,
+    body.user?.roles?.length ? `- Roles:\n  - ${body.user.roles.join("\n  - ")}` : null,
+    body.user?.projects?.length ? `- Projects:\n  - ${body.user.projects.join("\n  - ")}` : null,
+    body.user?.goals?.length ? `- Goals:\n  - ${body.user.goals.join("\n  - ")}` : null,
+    body.user?.workingStyle?.length ? `- Working style:\n  - ${body.user.workingStyle.join("\n  - ")}` : null,
+    body.user?.preferences?.length ? `- Preferences:\n  - ${body.user.preferences.join("\n  - ")}` : null,
+  ].filter(Boolean).join("\n\n");
+
+  const soulMd = [
+    body.soul?.principles?.length ? `## Principles\n- ${body.soul.principles.join("\n- ")}` : null,
+    body.soul?.boundaries?.length ? `## Boundaries\n- ${body.soul.boundaries.join("\n- ")}` : null,
+    body.soul?.do?.length ? `## Do\n- ${body.soul.do.join("\n- ")}` : null,
+    body.soul?.dont?.length ? `## Don't\n- ${body.soul.dont.join("\n- ")}` : null,
+  ].filter(Boolean).join("\n\n");
+
+  // MEMORY.md: store a compact summary of imported profile for long-term recall
+  const memoryMd = [
+    `Imported profile on ${new Date().toISOString()}`,
+    identityMd ? `\n### IDENTITY\n${identityMd}` : null,
+    userMd ? `\n### USER\n${userMd}` : null,
+    soulMd ? `\n### SOUL\n${soulMd}` : null,
+  ].filter(Boolean).join("\n");
+
+  // Only overwrite if we received content (avoid nuking existing profiles)
+  if (identityMd.trim()) await updateCoreFile(user.id, "IDENTITY", { content: identityMd });
+  if (userMd.trim()) await updateCoreFile(user.id, "USER", { content: userMd });
+  if (soulMd.trim()) await updateCoreFile(user.id, "SOUL", { content: soulMd });
+  if (memoryMd.trim()) await updateCoreFile(user.id, "MEMORY", { content: memoryMd });
+
+  // 4) Import facts
   const facts = body.facts ?? [];
   const createdFactIds: number[] = [];
 
@@ -201,6 +241,12 @@ export async function POST(req: Request) {
     user: { id: user.id, userCode: user.userCode },
     imported: {
       displayName: displayName ?? null,
+      coreFilesUpdated: {
+        identity: Boolean(identityMd.trim()),
+        user: Boolean(userMd.trim()),
+        soul: Boolean(soulMd.trim()),
+        memory: Boolean(memoryMd.trim()),
+      },
       factCount: createdFactIds.length,
     },
   });
