@@ -142,6 +142,16 @@ async function buildPlannerContext(
         soul: core.SOUL,
         memory: core.MEMORY,
         daily,
+        // Token budgeting to prevent prompt bloat (SaaS-safe defaults)
+        budget: {
+            totalTokens: 2800,
+            soulTokens: 750,
+            userTokens: 650,
+            identityTokens: 250,
+            memoryTokens: 800,
+            maxDailyFiles: 2,
+            dailyPerFileTokens: 175,
+        },
     });
 
     // Retrieve user facts (auto-extracted)
