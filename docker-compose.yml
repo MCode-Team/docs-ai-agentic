@@ -75,6 +75,37 @@ services:
       retries: 3
       start_period: 30s
 
+  maintenance-runner:
+    image: curlimages/curl:8.11.1
+    container_name: memory-maintenance-runner
+    depends_on:
+      - web
+    environment:
+      - CRON_SECRET=${CRON_SECRET:-}
+      - MAINTENANCE_INTERVAL_SECONDS=${MAINTENANCE_INTERVAL_SECONDS:-60}
+      - MAINTENANCE_BATCH_LIMIT=${MAINTENANCE_BATCH_LIMIT:-5}
+      - MAINTENANCE_DAYS=${MAINTENANCE_DAYS:-3}
+    command:
+      - sh
+      - -lc
+      - |
+        set -e
+        if [ -z "$$CRON_SECRET" ]; then
+          echo "CRON_SECRET is required for maintenance-runner" >&2
+          exit 1
+        fi
+        echo "Starting maintenance runner. Interval=$${MAINTENANCE_INTERVAL_SECONDS}s"
+        while true; do
+          curl -sS -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-cron-secret: $${CRON_SECRET}" \
+            http://web:3000/api/internal/run-memory-maintenance \
+            -d "{\"limit\":$${MAINTENANCE_BATCH_LIMIT},\"days\":$${MAINTENANCE_DAYS}}" \
+            || true
+          sleep $${MAINTENANCE_INTERVAL_SECONDS}
+        done
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   zerank_cache:
