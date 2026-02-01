@@ -18,11 +18,23 @@ export async function GET(_req: Request, ctx: { params: Promise<{ key: string }>
   if (!fileKey) return NextResponse.json({ ok: false, error: "Invalid file key" }, { status: 400 });
 
   const cookieStore = await cookies();
-  const userCode = cookieStore.get(USER_COOKIE_NAME)?.value;
-  const user = await getOrCreateUser(userCode);
+  const existing = cookieStore.get(USER_COOKIE_NAME)?.value;
+  const user = await getOrCreateUser(existing);
 
   const core = await getCoreFiles(user.id);
-  return NextResponse.json({ ok: true, file: core[fileKey] });
+  const res = NextResponse.json({ ok: true, file: core[fileKey] });
+  if (!existing) {
+    res.cookies.set({
+      name: USER_COOKIE_NAME,
+      value: user.userCode,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 365,
+      path: "/",
+    });
+  }
+  return res;
 }
 
 export async function PUT(req: Request, ctx: { params: Promise<{ key: string }> }) {
@@ -31,8 +43,8 @@ export async function PUT(req: Request, ctx: { params: Promise<{ key: string }> 
   if (!fileKey) return NextResponse.json({ ok: false, error: "Invalid file key" }, { status: 400 });
 
   const cookieStore = await cookies();
-  const userCode = cookieStore.get(USER_COOKIE_NAME)?.value;
-  const user = await getOrCreateUser(userCode);
+  const existing = cookieStore.get(USER_COOKIE_NAME)?.value;
+  const user = await getOrCreateUser(existing);
 
   let body: { content?: string; expectedVersion?: number };
   try {
@@ -50,7 +62,19 @@ export async function PUT(req: Request, ctx: { params: Promise<{ key: string }> 
       content: body.content,
       expectedVersion: body.expectedVersion,
     });
-    return NextResponse.json({ ok: true, file: updated });
+    const res = NextResponse.json({ ok: true, file: updated });
+    if (!existing) {
+      res.cookies.set({
+        name: USER_COOKIE_NAME,
+        value: user.userCode,
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 365,
+        path: "/",
+      });
+    }
+    return res;
   } catch (e) {
     if (String(e) === "Error: VERSION_CONFLICT") {
       return NextResponse.json({ ok: false, error: "VERSION_CONFLICT" }, { status: 409 });

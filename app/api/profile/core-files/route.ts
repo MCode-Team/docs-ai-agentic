@@ -7,11 +7,11 @@ const USER_COOKIE_NAME = "user_code";
 
 export async function GET() {
   const cookieStore = await cookies();
-  const userCode = cookieStore.get(USER_COOKIE_NAME)?.value;
-  const user = await getOrCreateUser(userCode);
+  const existing = cookieStore.get(USER_COOKIE_NAME)?.value;
+  const user = await getOrCreateUser(existing);
 
   const core = await getCoreFiles(user.id);
-  return NextResponse.json({
+  const res = NextResponse.json({
     ok: true,
     user: { id: user.id, userCode: user.userCode },
     coreFiles: {
@@ -21,4 +21,19 @@ export async function GET() {
       MEMORY: core.MEMORY,
     },
   });
+
+  // Set cookie for new users (same behavior as /api/ask-ai)
+  if (!existing) {
+    res.cookies.set({
+      name: USER_COOKIE_NAME,
+      value: user.userCode,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 365,
+      path: "/",
+    });
+  }
+
+  return res;
 }

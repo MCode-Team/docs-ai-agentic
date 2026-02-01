@@ -68,6 +68,20 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
                             </div>
                         </div>
 
+                        {/* Profile / Onboard */}
+                        <a
+                            href="/profile"
+                            className="px-3 py-1.5 rounded-md text-[13px] font-medium border border-border text-gray-700 hover:text-black hover:bg-gray-50"
+                        >
+                            Profile
+                        </a>
+                        <a
+                            href="/onboard"
+                            className="px-3 py-1.5 rounded-md text-[13px] font-medium border border-border text-gray-700 hover:text-black hover:bg-gray-50"
+                        >
+                            Onboard
+                        </a>
+
                         {/* Ask AI Button */}
                         <button
                             onClick={() => setIsAskAIOpen(!isAskAIOpen)}
