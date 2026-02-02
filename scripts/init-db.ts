@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { db } from "@/lib/db";
+import { db } from "../lib/db";
 
 async function main() {
     try {

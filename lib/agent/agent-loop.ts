@@ -26,7 +26,7 @@ import { getCoreFiles, getRecentDailyMemories } from "@/lib/profile";
 import { renderOpenClawStyleContext } from "@/lib/profile/context";
 import { retrieveDocs } from "@/lib/retrieval-docs";
 import { retrieveDictionary } from "@/lib/retrieval-dictionary";
-import { rerankZeroRank2 } from "@/lib/rerank-zerank2";
+import { rerankCohere } from "@/lib/rerank-cohere";
 
 const MAX_ITERATIONS = 10;
 const MAX_TOOL_CALLS_PER_TURN = 6;
@@ -84,11 +84,11 @@ export async function initAgentState(
         isComplete: false,
         expert: expertOverride
             ? {
-                  id: expertOverride,
-                  label: expertOverride.toUpperCase(),
-                  rationale: "User selected",
-                  allowedTools: getExpertProfile(expertOverride as any)?.allowedTools ?? [],
-              }
+                id: expertOverride,
+                label: expertOverride.toUpperCase(),
+                rationale: "User selected",
+                allowedTools: getExpertProfile(expertOverride as any)?.allowedTools ?? [],
+            }
             : undefined,
         executionHistory: [],
         attemptCount: 0,
@@ -112,7 +112,7 @@ async function buildPlannerContext(
         url: d.url
     })) ?? await (async () => {
         const docsCandidates = await retrieveDocs(state.query, 12);
-        const docsReranked = await rerankZeroRank2(
+        const docsReranked = await rerankCohere(
             state.query,
             docsCandidates.map((c) => ({ id: c.id, text: c.content, meta: c }))
         );
@@ -186,11 +186,11 @@ async function buildPlannerContext(
         },
         expert: state.expert
             ? {
-                  id: state.expert.id,
-                  label: state.expert.label,
-                  instructions: getExpertProfile(state.expert.id as any)?.plannerInstructions || "",
-                  allowedTools: state.expert.allowedTools,
-              }
+                id: state.expert.id,
+                label: state.expert.label,
+                instructions: getExpertProfile(state.expert.id as any)?.plannerInstructions || "",
+                allowedTools: state.expert.allowedTools,
+            }
             : undefined,
         lastError,
         executionHistory: state.executionHistory,

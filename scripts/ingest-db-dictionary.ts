@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "../lib/db";
 import { embed } from "ai";
 import { openai } from "@ai-sdk/openai";
 
