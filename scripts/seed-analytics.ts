@@ -88,32 +88,32 @@ async function seedMasters(opts: {
 
   await db`
     INSERT INTO analytics.branches ${db(branches, [
-      "branch_id",
-      "branch_code",
-      "branch_name",
-      "province",
-      "region",
-    ])}
+    "branch_id",
+    "branch_code",
+    "branch_name",
+    "province",
+    "region",
+  ])}
     ON CONFLICT (branch_id) DO NOTHING
   `;
 
   await db`
     INSERT INTO analytics.product_categories ${db(categories, [
-      "category_id",
-      "category_name",
-      "parent_category_id",
-    ])}
+    "category_id",
+    "category_name",
+    "parent_category_id",
+  ])}
     ON CONFLICT (category_id) DO NOTHING
   `;
 
   await db`
     INSERT INTO analytics.products ${db(products, [
-      "sku",
-      "product_name",
-      "brand_name",
-      "category_id",
-      "uom",
-    ])}
+    "sku",
+    "product_name",
+    "brand_name",
+    "category_id",
+    "uom",
+  ])}
     ON CONFLICT (sku) DO NOTHING
   `;
 
@@ -180,14 +180,14 @@ async function seedFacts(opts: {
     const inserted = await db`
       INSERT INTO analytics.orders (order_code, order_datetime, branch_id, customer_id, order_status, channel, net_amount)
       SELECT * FROM ${(db as any)(orders, [
-        "order_code",
-        "order_datetime",
-        "branch_id",
-        "customer_id",
-        "order_status",
-        "channel",
-        "net_amount",
-      ])}
+      "order_code",
+      "order_datetime",
+      "branch_id",
+      "customer_id",
+      "order_status",
+      "channel",
+      "net_amount",
+    ])}
       RETURNING order_id, order_code, order_datetime, branch_id, customer_id
     `;
 
@@ -224,29 +224,22 @@ async function seedFacts(opts: {
     if (lines.length) {
       await db`
         INSERT INTO analytics.sales_lines ${(db as any)(lines, [
-          "order_id",
-          "order_datetime",
-          "branch_id",
-          "customer_id",
-          "sku",
-          "qty",
-          "net_sales",
-          "cost",
-        ])}
+        "order_id",
+        "order_datetime",
+        "branch_id",
+        "customer_id",
+        "sku",
+        "qty",
+        "net_sales",
+        "cost",
+      ])}
       `;
       insertedLines += lines.length;
     }
 
-    // Update order header net_amount
-    // Batch update using VALUES
-    const updates = Array.from(orderNetMap.entries()).map(([order_id, net_amount]) => ({ order_id, net_amount }));
-    if (updates.length) {
-      await db`
-        UPDATE analytics.orders o
-        SET net_amount = u.net_amount
-        FROM ${(db as any)(updates, ["order_id", "net_amount"]) } AS u(order_id, net_amount)
-        WHERE o.order_id = u.order_id
-      `;
+    // Update order header net_amount - do it one by one
+    for (const [orderId, netAmount] of orderNetMap) {
+      await db`UPDATE analytics.orders SET net_amount = ${netAmount} WHERE order_id = ${orderId}`;
     }
   }
 
@@ -287,12 +280,12 @@ async function seedInventory(opts: {
   if (rows.length) {
     await db`
       INSERT INTO analytics.inventory_current ${(db as any)(rows, [
-        "branch_id",
-        "sku",
-        "on_hand_qty",
-        "on_hand_value",
-        "updated_at",
-      ])}
+      "branch_id",
+      "sku",
+      "on_hand_qty",
+      "on_hand_value",
+      "updated_at",
+    ])}
       ON CONFLICT (branch_id, sku)
       DO UPDATE SET
         on_hand_qty = EXCLUDED.on_hand_qty,
@@ -347,6 +340,6 @@ main().catch(async (err) => {
   console.error(err);
   try {
     await db.end();
-  } catch {}
+  } catch { }
   process.exit(1);
 });

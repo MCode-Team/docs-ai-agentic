@@ -7,7 +7,7 @@ import {
 } from "@/lib/agent";
 import { retrieveDocs } from "@/lib/retrieval-docs";
 import { retrieveDictionary } from "@/lib/retrieval-dictionary";
-import { rerankZeroRank2 } from "@/lib/rerank-zerank2";
+import { rerankCohere } from "@/lib/rerank-cohere";
 import {
   createUIMessageStream,
   createUIMessageStreamResponse,
@@ -92,6 +92,7 @@ async function handleAgenticMode(
 
         // 2. Fetch sources (Blocking operation moved inside stream)
         const sources = await buildSources(question);
+        console.log("sources", sources);
 
         // 3. Initialize agent state with pre-fetched sources and history
         const state = await initAgentState(userId, conversationId, question, sources, messages, expertId);
@@ -277,7 +278,7 @@ ${dictContext}
  */
 async function buildSources(question: string) {
   const docsCandidates = await retrieveDocs(question, 12);
-  const docsReranked = await rerankZeroRank2(
+  const docsReranked = await rerankCohere(
     question,
     docsCandidates.map((c) => ({ id: c.id, text: c.content, meta: c }))
   );

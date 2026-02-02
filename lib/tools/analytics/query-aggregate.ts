@@ -250,6 +250,6 @@ export const queryAggregateTool = tool({
       return await tx.unsafe(sql, params);
     });
 
-    return { ok: true, dataset, rowCount: rows.length, rows };
+    return { ok: true, dataset, rowCount: rows.length, rows: [...rows] };
   },
 } as any);

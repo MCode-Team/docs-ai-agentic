@@ -16,6 +16,7 @@ export const getOrderStatusCountsTool = tool({
       GROUP BY order_status
       ORDER BY total DESC
     `;
-        return rows as unknown as any[];
+        // Convert postgres Result to plain array
+        return [...rows];
     },
 } as any);

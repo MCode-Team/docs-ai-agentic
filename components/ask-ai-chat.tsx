@@ -216,6 +216,15 @@ function Steps({ steps }: { steps: Array<{ type: string; data: Record<string, un
 
   if (steps.length === 0) return null;
 
+  // Calculate total time from first to last step
+  const timestamps = steps
+    .map((s) => (s.data as any).timestamp as number | undefined)
+    .filter((t): t is number => typeof t === "number");
+  const totalTime =
+    timestamps.length >= 2
+      ? ((Math.max(...timestamps) - Math.min(...timestamps)) / 1000).toFixed(1)
+      : null;
+
   return (
     <div className="rounded-lg border border-gray-100 overflow-hidden mb-2 bg-gray-50/30">
       <button
@@ -224,7 +233,7 @@ function Steps({ steps }: { steps: Array<{ type: string; data: Record<string, un
       >
         <div className="flex items-center gap-2">
           {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          <span>Process Steps ({steps.length})</span>
+          <span>Process Steps ({steps.length}){totalTime && <span className="text-gray-400 font-mono ml-1">• {totalTime}s</span>}</span>
         </div>
         {!isOpen && (
           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-gray-100/80 text-[10px]">

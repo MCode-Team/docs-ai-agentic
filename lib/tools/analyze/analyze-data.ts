@@ -9,8 +9,23 @@ export const analyzeDataTool = tool({
         sumField: z.string().optional(),
         topN: z.number().optional().default(20),
     }),
-    execute: async ({ rows, groupBy, sumField, topN }: { rows: any[]; groupBy?: string; sumField?: string; topN: number }) => {
-        if (!rows || !Array.isArray(rows)) {
+    execute: async ({ rows, groupBy, sumField, topN }: { rows: any; groupBy?: string; sumField?: string; topN: number }) => {
+        // Handle array-like objects (e.g., postgres.js Result)
+        let dataRows: any[];
+        if (Array.isArray(rows)) {
+            dataRows = rows;
+        } else if (rows && typeof rows === 'object') {
+            // Try to convert array-like object to array
+            if (typeof rows.length === 'number' || '0' in rows) {
+                dataRows = Array.from(Object.values(rows).filter(v => typeof v === 'object' && v !== null));
+            } else {
+                return {
+                    error: "Invalid data: 'rows' must be an array of objects.",
+                    receivedType: typeof rows,
+                    keys: Object.keys(rows).slice(0, 10)
+                };
+            }
+        } else {
             return {
                 error: "Invalid data: 'rows' must be an array of objects.",
                 receivedType: typeof rows,
@@ -18,8 +33,12 @@ export const analyzeDataTool = tool({
             };
         }
 
+        if (dataRows.length === 0) {
+            return { error: "No data rows to analyze", totalRows: 0 };
+        }
+
         const dfd = await import("danfojs");
-        const df = new dfd.DataFrame(rows);
+        const df = new dfd.DataFrame(dataRows);
 
         if (!groupBy || !sumField) {
             return {
