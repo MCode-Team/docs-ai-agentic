@@ -21,6 +21,7 @@ import {
     createFact,
     getUserFacts,
     updateConversationTitle,
+    getRecentConversationSummaries,
 } from "@/lib/memory";
 import { getCoreFiles, getRecentDailyMemories } from "@/lib/profile";
 import { renderOpenClawStyleContext } from "@/lib/profile/context";
@@ -172,13 +173,39 @@ async function buildPlannerContext(
         .map((f) => `[${f.factType}] ${f.content}`)
         .join("\n");
 
+    // Build tool results summary from previous Expert (for handoff continuity)
+    // สร้างสรุป tool results เพื่อส่งต่อให้ Expert ถัดไปรู้ผลลัพธ์
+    const toolResultsSummary = state.toolResults.size > 0
+        ? Array.from(state.toolResults.entries())
+            .map(([key, value]) => {
+                const valueStr = typeof value === 'string'
+                    ? value
+                    : JSON.stringify(value);
+                return `[${key}]: ${valueStr?.slice(0, 500) || '(empty)'}`;
+            })
+            .join("\n")
+        : undefined;
+
+    // Get context from user's previous conversations (cross-conversation memory)
+    // ดึง context จาก conversations ก่อนหน้า
+    const prevConvSummaries = await getRecentConversationSummaries(
+        state.userId,
+        state.conversationId,
+        3
+    );
+    const previousConversationContext = prevConvSummaries.length > 0
+        ? prevConvSummaries
+            .map((s, i) => `PREV_CONV${i + 1}: ${s.title || 'Untitled'}\nUser: ${s.lastUserMessage}\nAssistant: ${s.lastAssistantMessage}`)
+            .join("\n---\n")
+        : undefined;
+
     return {
         query: state.query,
         docsContext,
         dictContext,
         factsContext,
         coreContext,
-        recentMessages: state.messages.slice(-10),
+        recentMessages: state.messages.slice(-15), // Increased from 10 to 15
         userPreferences: {
             language: prefs?.language || "th",
             responseTone: prefs?.responseTone || "friendly",
@@ -194,6 +221,8 @@ async function buildPlannerContext(
             : undefined,
         lastError,
         executionHistory: state.executionHistory,
+        toolResultsSummary,
+        previousConversationContext,
     };
 }
 

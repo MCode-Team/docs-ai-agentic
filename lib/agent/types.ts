@@ -126,4 +126,14 @@ export interface PlannerContext {
         result: unknown;
         error?: string;
     }>;
+    /**
+     * Summary of tool results from previous Expert (for handoff continuity)
+     * ส่งต่อผลลัพธ์ Tool จาก Expert ก่อนหน้า
+     */
+    toolResultsSummary?: string;
+    /**
+     * Context from user's previous conversations (cross-conversation memory)
+     * ข้อมูลสรุปจาก conversations ก่อนหน้าของ user
+     */
+    previousConversationContext?: string;
 }

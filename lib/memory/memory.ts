@@ -1,11 +1,11 @@
 import { createId } from "@paralleldrive/cuid2";
 import { db } from "@/lib/db";
 import type {
-    Conversation,
-    Message,
-    CreateMessageInput,
-    MemoryFact,
-    CreateFactInput,
+  Conversation,
+  Message,
+  CreateMessageInput,
+  MemoryFact,
+  CreateFactInput,
 } from "./types";
 
 // =====================================================
@@ -16,39 +16,39 @@ import type {
  * Create a new conversation
  */
 export async function createConversation(
-    userId: string,
-    title?: string
+  userId: string,
+  title?: string
 ): Promise<Conversation> {
-    const id = createId();
-    const [conv] = await db<Conversation[]>`
+  const id = createId();
+  const [conv] = await db<Conversation[]>`
     INSERT INTO conversations (id, user_id, title)
     VALUES (${id}, ${userId}, ${title ?? null})
     RETURNING id, user_id as "userId", title, 
               created_at as "createdAt", updated_at as "updatedAt"
   `;
-    return conv;
+  return conv;
 }
 
 /**
  * Get conversation by ID
  */
 export async function getConversation(id: string): Promise<Conversation | null> {
-    const [conv] = await db<Conversation[]>`
+  const [conv] = await db<Conversation[]>`
     SELECT id, user_id as "userId", title, 
            created_at as "createdAt", updated_at as "updatedAt"
     FROM conversations WHERE id = ${id}
   `;
-    return conv || null;
+  return conv || null;
 }
 
 /**
  * List conversations for a user
  */
 export async function listConversations(
-    userId: string,
-    limit = 20
+  userId: string,
+  limit = 20
 ): Promise<Conversation[]> {
-    return db<Conversation[]>`
+  return db<Conversation[]>`
     SELECT id, user_id as "userId", title, 
            created_at as "createdAt", updated_at as "updatedAt"
     FROM conversations 
@@ -62,25 +62,25 @@ export async function listConversations(
  * Update conversation title
  */
 export async function updateConversationTitle(
-    id: string,
-    title: string
+  id: string,
+  title: string
 ): Promise<Conversation | null> {
-    const [conv] = await db<Conversation[]>`
+  const [conv] = await db<Conversation[]>`
     UPDATE conversations 
     SET title = ${title}, updated_at = now()
     WHERE id = ${id}
     RETURNING id, user_id as "userId", title, 
               created_at as "createdAt", updated_at as "updatedAt"
   `;
-    return conv || null;
+  return conv || null;
 }
 
 /**
  * Delete conversation
  */
 export async function deleteConversation(id: string): Promise<boolean> {
-    const result = await db`DELETE FROM conversations WHERE id = ${id}`;
-    return result.count > 0;
+  const result = await db`DELETE FROM conversations WHERE id = ${id}`;
+  return result.count > 0;
 }
 
 // =====================================================
@@ -91,13 +91,13 @@ export async function deleteConversation(id: string): Promise<boolean> {
  * Add a message to a conversation
  */
 export async function addMessage(
-    conversationId: string,
-    input: CreateMessageInput
+  conversationId: string,
+  input: CreateMessageInput
 ): Promise<Message> {
-    // Update conversation's updated_at
-    await db`UPDATE conversations SET updated_at = now() WHERE id = ${conversationId}`;
+  // Update conversation's updated_at
+  await db`UPDATE conversations SET updated_at = now() WHERE id = ${conversationId}`;
 
-    const [msg] = await db<Message[]>`
+  const [msg] = await db<Message[]>`
     INSERT INTO conversation_messages 
       (conversation_id, role, content, tool_name, tool_input, tool_output)
     VALUES (
@@ -112,17 +112,17 @@ export async function addMessage(
               tool_name as "toolName", tool_input as "toolInput", 
               tool_output as "toolOutput", created_at as "createdAt"
   `;
-    return msg;
+  return msg;
 }
 
 /**
  * Get messages for a conversation
  */
 export async function getMessages(
-    conversationId: string,
-    limit = 50
+  conversationId: string,
+  limit = 50
 ): Promise<Message[]> {
-    return db<Message[]>`
+  return db<Message[]>`
     SELECT id, conversation_id as "conversationId", role, content,
            tool_name as "toolName", tool_input as "toolInput", 
            tool_output as "toolOutput", created_at as "createdAt"
@@ -137,10 +137,10 @@ export async function getMessages(
  * Get recent messages across all conversations for a user
  */
 export async function getRecentUserMessages(
-    userId: string,
-    limit = 20
+  userId: string,
+  limit = 20
 ): Promise<Message[]> {
-    return db<Message[]>`
+  return db<Message[]>`
     SELECT m.id, m.conversation_id as "conversationId", m.role, m.content,
            m.tool_name as "toolName", m.tool_input as "toolInput", 
            m.tool_output as "toolOutput", m.created_at as "createdAt"
@@ -160,7 +160,7 @@ export async function getRecentUserMessages(
  * Create a memory fact
  */
 export async function createFact(input: CreateFactInput): Promise<MemoryFact> {
-    const [fact] = await db<MemoryFact[]>`
+  const [fact] = await db<MemoryFact[]>`
     INSERT INTO memory_facts 
       (conversation_id, user_id, fact_type, content, embedding, importance, expires_at)
     VALUES (
@@ -176,17 +176,17 @@ export async function createFact(input: CreateFactInput): Promise<MemoryFact> {
               fact_type as "factType", content, importance,
               created_at as "createdAt", expires_at as "expiresAt"
   `;
-    return fact;
+  return fact;
 }
 
 /**
  * Get facts for a user
  */
 export async function getUserFacts(
-    userId: string,
-    limit = 20
+  userId: string,
+  limit = 20
 ): Promise<MemoryFact[]> {
-    return db<MemoryFact[]>`
+  return db<MemoryFact[]>`
     SELECT id, conversation_id as "conversationId", user_id as "userId",
            fact_type as "factType", content, importance,
            created_at as "createdAt", expires_at as "expiresAt"
@@ -202,11 +202,11 @@ export async function getUserFacts(
  * Search facts by semantic similarity
  */
 export async function searchFacts(
-    userId: string,
-    queryEmbedding: number[],
-    limit = 5
+  userId: string,
+  queryEmbedding: number[],
+  limit = 5
 ): Promise<MemoryFact[]> {
-    return db<MemoryFact[]>`
+  return db<MemoryFact[]>`
     SELECT id, conversation_id as "conversationId", user_id as "userId",
            fact_type as "factType", content, importance,
            created_at as "createdAt", expires_at as "expiresAt"
@@ -223,8 +223,75 @@ export async function searchFacts(
  * Delete expired facts
  */
 export async function cleanupExpiredFacts(): Promise<number> {
-    const result = await db`
+  const result = await db`
     DELETE FROM memory_facts WHERE expires_at < now()
   `;
-    return result.count;
+  return result.count;
 }
+
+// =====================================================
+// CROSS-CONVERSATION CONTEXT
+// =====================================================
+
+interface ConversationSummary {
+  conversationId: string;
+  title: string | null;
+  lastUserMessage: string;
+  lastAssistantMessage: string;
+  createdAt: Date;
+}
+
+/**
+ * Get summaries from user's recent conversations
+ * Used to provide cross-conversation context for new conversations
+ * ดึงสรุปจาก conversations ก่อนหน้าเพื่อให้ Agent รู้ context ข้าม conversation
+ */
+export async function getRecentConversationSummaries(
+  userId: string,
+  currentConversationId: string | null,
+  limit = 5
+): Promise<ConversationSummary[]> {
+  // Get recent conversations excluding current one
+  const conversations = await db<{
+    id: string;
+    title: string | null;
+    createdAt: Date;
+  }[]>`
+        SELECT id, title, created_at as "createdAt"
+        FROM conversations
+        WHERE user_id = ${userId}
+          ${currentConversationId ? db`AND id != ${currentConversationId}` : db``}
+        ORDER BY updated_at DESC
+        LIMIT ${limit}
+    `;
+
+  // Get last user and assistant messages for each conversation
+  const summaries: ConversationSummary[] = [];
+
+  for (const conv of conversations) {
+    const messages = await db<Message[]>`
+            SELECT role, content
+            FROM conversation_messages
+            WHERE conversation_id = ${conv.id}
+              AND role IN ('user', 'assistant')
+            ORDER BY created_at DESC
+            LIMIT 4
+        `;
+
+    const lastUser = messages.find(m => m.role === 'user');
+    const lastAssistant = messages.find(m => m.role === 'assistant');
+
+    if (lastUser || lastAssistant) {
+      summaries.push({
+        conversationId: conv.id,
+        title: conv.title,
+        lastUserMessage: lastUser?.content?.slice(0, 200) || '',
+        lastAssistantMessage: lastAssistant?.content?.slice(0, 300) || '',
+        createdAt: conv.createdAt,
+      });
+    }
+  }
+
+  return summaries;
+}
+

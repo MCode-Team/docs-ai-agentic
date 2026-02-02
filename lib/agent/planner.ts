@@ -83,8 +83,22 @@ ${context.dictContext || "(ไม่มี)"}
 User Facts (auto-extracted):
 ${context.factsContext || "(ไม่มี)"}
 
+${context.previousConversationContext ? `
+📚 PREVIOUS CONVERSATIONS (context จาก conversations ก่อนหน้าของ user):
+${context.previousConversationContext}
+---
+ใช้ context นี้เพื่อเข้าใจ user และอ้างอิงถ้าเกี่ยวข้อง แต่ไม่ต้องกล่าวซ้ำถ้าไม่จำเป็น
+` : ""}
+
 Recent Conversation:
-${context.recentMessages.slice(-5).map((m) => `${m.role}: ${m.content.slice(0, 200)}`).join("\n") || "(ไม่มี)"}
+${context.recentMessages.slice(-8).map((m) => `${m.role}: ${m.content.slice(0, 250)}`).join("\n") || "(ไม่มี)"}
+
+${context.toolResultsSummary ? `
+🔧 TOOL RESULTS FROM PREVIOUS EXPERT (ผลลัพธ์ Tool จาก Expert ก่อนหน้า):
+${context.toolResultsSummary}
+---
+ใช้ข้อมูลนี้ต่อยอดได้เลย ไม่ต้อง call tool ซ้ำ
+` : ""}
 
 User Preferences:
 - Language: ${context.userPreferences.language}
