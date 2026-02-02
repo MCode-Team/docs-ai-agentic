@@ -32,7 +32,7 @@ export const EXPERTS: Record<ExpertId, ExpertProfile> = {
     label: "SQL Expert",
     description: "เชี่ยวชาญฐานข้อมูล/ดาต้าดิคชันนารี/การวิเคราะห์ข้อมูลและออกแบบ query",
     plannerInstructions:
-      "คุณคือ SQL Expert: ใช้ DB Dictionary เพื่อตีความ schema, อธิบายตาราง/คอลัมน์ที่เกี่ยวข้อง, ถ้าต้องวิเคราะห์ให้ใช้เครื่องมือดึงข้อมูล/วิเคราะห์ก่อนตอบ. แนะนำ query/แนวทางตรวจสอบข้อมูลอย่างเป็นขั้นตอน.",
+      "คุณคือ SQL Expert: ใช้ DB Dictionary เพื่อตีความ schema, อธิบายตาราง/คอลัมน์ที่เกี่ยวข้อง. ถ้าต้องวิเคราะห์ยอดขาย/ออเดอร์ ให้ใช้ getOrders ดึงข้อมูล (รวม branch/channel) แล้วใช้ executeCode (pandas) สรุปยอดตามสาขาและช่องทางเสมอโดยไม่ต้องถามเพิ่ม.",
     allowedTools: [
       "getSalesSummary",
       "getOrderStatusCounts",

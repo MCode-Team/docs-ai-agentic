@@ -211,19 +211,36 @@ function Thinking({ thought }: { thought?: string }) {
   );
 }
 
-function Steps({ steps }: { steps: Array<{ type: string; data: Record<string, unknown> }> }) {
+function Steps({ steps, isFinished }: { steps: Array<{ type: string; data: Record<string, unknown> }>; isFinished: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (isFinished) return;
+    setNow(Date.now());
+    const interval = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(interval);
+  }, [isFinished]);
 
   if (steps.length === 0) return null;
 
-  // Calculate total time from first to last step
+  // Calculate total time
   const timestamps = steps
     .map((s) => (s.data as any).timestamp as number | undefined)
     .filter((t): t is number => typeof t === "number");
-  const totalTime =
-    timestamps.length >= 2
-      ? ((Math.max(...timestamps) - Math.min(...timestamps)) / 1000).toFixed(1)
-      : null;
+
+  let totalTime: string | null = null;
+
+  if (timestamps.length > 0) {
+    const startTime = Math.min(...timestamps);
+    const lastStepTime = Math.max(...timestamps);
+    const endTime = isFinished ? lastStepTime : Math.max(lastStepTime, now);
+
+    // Show time if we have >= 2 steps (completed duration) OR if it's running (live duration)
+    if (timestamps.length >= 2 || !isFinished) {
+      totalTime = ((endTime - startTime) / 1000).toFixed(1);
+    }
+  }
 
   return (
     <div className="rounded-lg border border-gray-100 overflow-hidden mb-2 bg-gray-50/30">
@@ -720,6 +737,9 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                   const steps = getSteps(m);
                   const sources = getSources(m);
                   const pendingTool = getPendingTool(m);
+                  const isLastMessage = m.id === messages[messages.length - 1].id;
+                  // If it's the last message and still loading, count it as not finished
+                  const isFinished = !isLastMessage || !isLoading;
 
                   return (
                     <div key={m.id} className="group flex w-full items-start justify-start gap-2 py-5">
@@ -728,7 +748,7 @@ export function AskAIChat({ onClose }: AskAIChatProps) {
                       </div>
 
                       <div className="flex w-full flex-col min-w-0">
-                        <Steps steps={steps} />
+                        <Steps steps={steps} isFinished={isFinished} />
 
                         {/* Pending Tool Approval */}
                         {pendingTool && (

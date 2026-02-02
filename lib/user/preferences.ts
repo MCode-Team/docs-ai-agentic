@@ -49,11 +49,26 @@ export async function updateUserPreferences(
  * Check if a tool should be auto-approved for a user
  */
 const SAFE_TOOLS = [
+    // Fixed query tools (read-only)
     'getSalesSummary',
     'getOrderStatusCounts',
+    'getOrders',
+
+    // Analytics tools (read-only, aggregations)
     'analyzeData',
-    // Analytics aggregate tool is designed to return summarized results only
-    'queryAggregate'
+    'queryAggregate',
+    'trendReport',
+    'cohortReport',
+    'dataQualityReport',
+    'oosReport',
+    'reportComposer',
+
+    // Export tools (user-requested exports)
+    'exportExcelDynamic',
+    'exportExcelArtifact',
+
+    // Code execution (sandboxed)
+    'executeCode',
 ];
 
 // Dangerous tools should never be auto-approved in SaaS.

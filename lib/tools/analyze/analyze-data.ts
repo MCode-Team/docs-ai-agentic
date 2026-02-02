@@ -14,8 +14,21 @@ export const analyzeDataTool = tool({
         let dataRows: any[];
         if (Array.isArray(rows)) {
             dataRows = rows;
+        } else if (typeof rows === 'string') {
+            try {
+                const parsed = JSON.parse(rows);
+                if (Array.isArray(parsed)) {
+                    dataRows = parsed;
+                } else if (parsed && typeof parsed === 'object' && (typeof parsed.length === 'number' || '0' in parsed)) {
+                    dataRows = Array.from(Object.values(parsed).filter(v => typeof v === 'object' && v !== null));
+                } else {
+                    return { error: "Parsed string is not an array." };
+                }
+            } catch (e) {
+                return { error: "Failed to parse string input as JSON." };
+            }
         } else if (rows && typeof rows === 'object') {
-            // Try to convert array-like object to array
+            // Try to convert array-like object to array (e.g. postgres Result)
             if (typeof rows.length === 'number' || '0' in rows) {
                 dataRows = Array.from(Object.values(rows).filter(v => typeof v === 'object' && v !== null));
             } else {
