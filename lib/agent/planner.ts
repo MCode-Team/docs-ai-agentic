@@ -1,5 +1,5 @@
-import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
+import { getChatModel } from "@/lib/llm";
 import type { PlanStep, PlannerContext } from "./types";
 import { toolRegistry } from "@/lib/tools/registry";
 
@@ -129,7 +129,7 @@ ${toolDescriptions}
 `.trim();
 
     const result = await generateText({
-        model: openai("gpt-5-mini"),
+        model: getChatModel(),
         system: PLANNER_SYSTEM_PROMPT,
         messages: [{ role: "user", content: userContext }],
     });

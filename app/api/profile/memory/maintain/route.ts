@@ -31,9 +31,8 @@ export async function POST(req: Request) {
     .map((d) => `# memory/${d.day}.md\n${clip(d.content, 2000)}`)
     .join("\n\n---\n\n");
 
-  // NOTE: This uses the same AI provider as the rest of the app. Requires OPENAI_API_KEY.
-  const { openai } = await import("@ai-sdk/openai");
   const { generateText } = await import("ai");
+  const { getChatModel } = await import("@/lib/llm");
 
   const system = [
     "You are a memory curator.",
@@ -56,7 +55,7 @@ export async function POST(req: Request) {
   ].join("\n");
 
   const result = await generateText({
-    model: openai("gpt-5-mini"),
+    model: getChatModel(),
     system,
     messages: [{ role: "user", content: userMsg }],
   });

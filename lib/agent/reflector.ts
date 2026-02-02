@@ -1,5 +1,5 @@
-import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
+import { getChatModel } from "@/lib/llm";
 import type { AgentState, ReflectionResult, PlanStep } from "./types";
 
 const REFLECTOR_SYSTEM_PROMPT = `คุณคือ AI Reflector ที่ประเมินผลการทำงาน
@@ -48,7 +48,7 @@ ${state.reflections.slice(-3).join("\n") || "(ไม่มี)"}
 `.trim();
 
     const result = await generateText({
-        model: openai("gpt-5-mini"),
+        model: getChatModel(),
         system: REFLECTOR_SYSTEM_PROMPT,
         messages: [{ role: "user", content: stateContext }],
     });
@@ -74,7 +74,7 @@ export async function extractFactsFromConversation(
     toolResults: Map<string, unknown>
 ): Promise<{ facts: string[]; type: "preference" | "context" | "entity" | "summary" }[]> {
     const result = await generateText({
-        model: openai("gpt-5-mini"),
+        model: getChatModel(),
         system: `Extract important facts to remember from this conversation.
 Return JSON array: [{ "facts": ["fact1", "fact2"], "type": "preference|context|entity|summary" }]
 Only extract facts that would be useful for future conversations.
@@ -104,7 +104,7 @@ export async function generateConversationTitle(
     answer: string
 ): Promise<string> {
     const result = await generateText({
-        model: openai("gpt-5-mini"),
+        model: getChatModel(),
         system: "Generate a short title (max 50 chars) for this conversation. Return only the title, no quotes.",
         messages: [
             { role: "user", content: `Q: ${query}\nA: ${answer.slice(0, 200)}` },

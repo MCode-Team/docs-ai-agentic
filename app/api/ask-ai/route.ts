@@ -236,8 +236,8 @@ async function handleSimpleMode(
   question: string,
   messages: { role: string; content: string }[]
 ) {
-  const { openai } = await import("@ai-sdk/openai");
   const { streamText } = await import("ai");
+  const { getChatModel } = await import("@/lib/llm");
 
   const sources = await buildSources(question);
 
@@ -256,7 +256,7 @@ async function handleSimpleMode(
   }));
 
   const result = streamText({
-    model: openai("gpt-5-mini"),
+    model: getChatModel(),
     system: `
 คุณคือ Ask AI สำหรับ Docs + PostgreSQL
 ตอบคำถามตามข้อมูลที่ให้มา

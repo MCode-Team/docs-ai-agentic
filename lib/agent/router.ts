@@ -1,5 +1,5 @@
-import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
+import { getChatModel } from "@/lib/llm";
 import { EXPERTS, ROUTABLE_EXPERT_IDS, type ExpertId } from "./experts";
 
 export interface RouteResult {
@@ -37,7 +37,7 @@ export async function routeExpert(input: {
   };
 
   const result = await generateText({
-    model: openai("gpt-5-mini"),
+    model: getChatModel(),
     system: ROUTER_SYSTEM_PROMPT,
     messages: [{ role: "user", content: JSON.stringify(user) }],
   });

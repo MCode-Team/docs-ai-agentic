@@ -12,12 +12,20 @@ services:
       - SANDBOX_URL=http://sandbox:8000
       - MEMORY_MAINTENANCE_DELAY_MIN=${MEMORY_MAINTENANCE_DELAY_MIN:-10}
       - CRON_SECRET=${CRON_SECRET:-}
+      # Chat via Ollama (OpenAI-compatible)
+      - CHAT_PROVIDER=${CHAT_PROVIDER:-ollama}
+      - CHAT_MODEL=${CHAT_MODEL:-kimi-k2.5:cloud}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-ollama}
     depends_on:
       - db
       - sandbox
     # Ensure DB migrations are applied on every (re)start.
     # Safe because migrations use IF NOT EXISTS.
     command: ["sh", "-lc", "export PATH=/root/.bun/bin:$PATH && bun run db:migrate && bun run start"]
+    # For Linux hosts, enable host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   db:
